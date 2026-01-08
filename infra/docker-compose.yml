@@ -1,0 +1,101 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snowboard-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-snowboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snowboard_password}
+      POSTGRES_DB: ${POSTGRES_DB:-snowboard_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snowboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - snowboard-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: snowboard-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - snowboard-network
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: snowboard-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - storage_data:/app/runtime/storage
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-snowboard}:${POSTGRES_PASSWORD:-snowboard_password}@postgres:5432/${POSTGRES_DB:-snowboard_db}
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - snowboard-network
+    restart: unless-stopped
+
+  worker-cpu:
+    build:
+      context: ..
+      dockerfile: infra/docker/worker-cpu.Dockerfile
+    container_name: snowboard-worker-cpu
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - storage_data:/app/runtime/storage
+    env_file:
+      - ../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-snowboard}:${POSTGRES_PASSWORD:-snowboard_password}@postgres:5432/${POSTGRES_DB:-snowboard_db}
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - snowboard-network
+    restart: unless-stopped
+
+  # GPU worker placeholder - will be configured later with proper CUDA support
+  # For now using alpine as a placeholder until GPU infrastructure is set up
+  worker-gpu:
+    image: alpine:3.18
+    container_name: snowboard-worker-gpu
+    entrypoint: ["/bin/sh", "-c", "echo 'GPU worker placeholder - not yet configured'; tail -f /dev/null"]
+    networks:
+      - snowboard-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_data:
+    driver: local
+
+networks:
+  snowboard-network:
+    driver: bridge
