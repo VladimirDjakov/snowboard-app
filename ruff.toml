@@ -1,0 +1,37 @@
+# Ruff configuration for the entire project
+target-version = "py312"
+line-length = 100
+
+[format]
+# Use double quotes for strings
+quote-style = "double"
+# Indent with spaces
+indent-style = "space"
+# Respect magic trailing commas
+skip-magic-trailing-comma = false
+# Automatically detect the appropriate line ending
+line-ending = "auto"
+
+[lint]
+# Enable autofix
+fixable = ["ALL"]
+unfixable = []
+# Select lint rules
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+# Ignore specific rules
+ignore = []
+
+[lint.isort]
+# Use a single import line per package
+force-single-line = false
+# Sort imports
+known-first-party = ["backend", "workers"]
+

@@ -13,16 +13,10 @@ migrate:
 	@alembic upgrade head
 
 lint:
-	@echo "Running ruff linter..."
-	@bash tools/format.sh lint
+	@uv run --directory backend ruff check .
 
 format:
-	@echo "Running ruff formatter..."
-	@bash tools/format.sh format
-
-format-check:
-	@echo "Checking code formatting..."
-	@bash tools/format.sh format-check
+	@uv run --directory backend ruff format .
 
 test:
 	@echo "Run tests here"
