@@ -15,8 +15,12 @@ migrate:
 lint:
 	@uv run --directory backend ruff check .
 
+lint-fix:
+	@uv run --directory backend ruff check --fix .
+
 format:
 	@uv run --directory backend ruff format .
 
 test:
 	@echo "Run tests here"
+	@uv run --directory backend pytest tests/

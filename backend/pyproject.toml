@@ -7,9 +7,18 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.40.0",
+    "pydantic-settings>=2.0.0",
+    "python-json-logger>=2.0.0",
 ]
 
 [dependency-groups]
 lint = [
     "ruff>=0.14.10",
 ]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".."]
+testpaths = ["tests"]
