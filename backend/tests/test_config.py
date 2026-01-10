@@ -61,7 +61,6 @@ def test_config_s3_validation():
     orig_storage_backend = os.environ.get("STORAGE_BACKEND")
     os.environ["STORAGE_BACKEND"] = "s3"
 
-
     with pytest.raises(ValidationError, match="s3_endpoint_url is required"):
         Settings()
     # Always clean up

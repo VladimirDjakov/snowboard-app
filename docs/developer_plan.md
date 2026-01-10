@@ -76,7 +76,7 @@ todos:
 ### 2.1 Модели данных
 
 - Реализовать `backend/app/db/models.py`:
-  - `Video` (id, status, pipeline_version, model_version, etc.)
+  - `Video` (id, status, etc.)
   - `JobStage` (video_id, name, status, started_at, ended_at)
   - `Artifact` (video_id, kind, version, object_key)
 - Настроить `backend/app/db/session.py` (SQLAlchemy session)
