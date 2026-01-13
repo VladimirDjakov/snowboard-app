@@ -13,15 +13,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 
-from backend.app.clients.queue import get_queue_client
-from backend.app.clients.redis import check_redis_health, get_redis_connection
+from types import SimpleNamespace
+
+from backend.app.domain.analysis_job import Stage
+from backend.app.infrastructure.queue.redis_client import RedisClient
+from backend.app.infrastructure.queue.redis_queue import RedisQueue
+from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 
 
 def test_redis_connection() -> bool:
     """Test Redis connection."""
     print("Testing Redis connection...")
     try:
-        conn = get_redis_connection()
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        conn = client.get_connection()
         result = conn.ping()
         print(f"✓ Redis ping successful: {result}")
         return True
@@ -34,7 +39,8 @@ def test_redis_health() -> bool:
     """Test Redis health check."""
     print("\nTesting Redis health check...")
     try:
-        is_healthy = check_redis_health()
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        is_healthy = client.check_health()
         if is_healthy:
             print("✓ Redis health check passed")
         else:
@@ -49,18 +55,19 @@ def test_enqueue_task() -> bool:
     """Test task enqueueing."""
     print("\nTesting task enqueueing...")
     try:
-        queue_client = get_queue_client()
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        queue = RedisQueue(client.get_connection(), TASK_MAP)
 
         # Test enqueue to CPU queue
         test_video_id = uuid4()
         print(f"Enqueueing transcode task for video_id: {test_video_id}")
-        job = queue_client.enqueue_transcode_task(test_video_id)
-        print(f"✓ Task enqueued to CPU queue. Job ID: {job.id}")
+        job_id = queue.publish(Stage.TRANSCODE, test_video_id)
+        print(f"✓ Task enqueued to CPU queue. Job ID: {job_id}")
 
         # Test enqueue to GPU queue
         print(f"Enqueueing pose task for video_id: {test_video_id}")
-        job = queue_client.enqueue_pose_task(test_video_id)
-        print(f"✓ Task enqueued to GPU queue. Job ID: {job.id}")
+        job_id = queue.publish(Stage.POSE, test_video_id)
+        print(f"✓ Task enqueued to GPU queue. Job ID: {job_id}")
 
         return True
     except Exception as e:

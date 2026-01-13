@@ -17,6 +17,15 @@ dependencies = [
     "rq>=2.6.1",
 ]
 
+[project.optional-dependencies]
+# Worker-specific dependencies are intentionally isolated here.
+workers-cpu = [
+    "jsonschema>=4.0.0",
+]
+workers-gpu = [
+    "pyyaml>=6.0.0",
+]
+
 [dependency-groups]
 lint = [
     "ruff>=0.14.10",

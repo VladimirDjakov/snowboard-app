@@ -1,5 +1,10 @@
 .PHONY: dev-up dev-down pull-models migrate test lint loadenv
 
+POSTGRES_USER ?= snowboard
+POSTGRES_PASSWORD ?= snowboard_password
+POSTGRES_DB ?= snowboard_db
+POSTGRES_PORT ?= 5432
+
 dev-up:
 	@docker compose -f infra/docker-compose.yml up -d
 
