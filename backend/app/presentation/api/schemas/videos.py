@@ -30,7 +30,7 @@ class UploadInfo(BaseModel):
     method: str = Field(..., description="HTTP method (typically 'PUT')")
     url: str = Field(..., description="Presigned URL for upload")
     headers: dict[str, str] = Field(..., description="Required headers (e.g., Content-Type)")
-    object_key: str = Field(..., description="Storage object key")
+    storage_path: str = Field(..., description="Storage path to the artifact")
     expires_in_sec: int = Field(..., description="URL expiration time in seconds", gt=0)
 
     model_config = ConfigDict(
@@ -39,7 +39,7 @@ class UploadInfo(BaseModel):
                 "method": "PUT",
                 "url": "https://storage.local/raw/...presigned...",
                 "headers": {"Content-Type": "video/mp4"},
-                "object_key": "raw/a2b6c4c8.../original.mp4",
+                "storage_path": "raw/a2b6c4c8.../original.mp4",
                 "expires_in_sec": 3600,
             }
         }
@@ -79,7 +79,7 @@ class CreateVideoResponse(BaseModel):
                     "method": "PUT",
                     "url": "https://storage.local/raw/...presigned...",
                     "headers": {"Content-Type": "video/mp4"},
-                    "object_key": "raw/a2b6c4c8.../original.mp4",
+                    "storage_path": "raw/a2b6c4c8.../original.mp4",
                     "expires_in_sec": 3600,
                 },
                 "limits": {
