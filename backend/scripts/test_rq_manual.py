@@ -13,8 +13,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 
-from backend.app.clients.queue import get_queue_client
-from backend.app.clients.redis import check_redis_health, get_redis_connection
+from backend.app.domain.analysis_job import Stage
+from backend.app.infrastructure.queue.redis_client import check_redis_health, get_redis_connection
+from backend.app.infrastructure.queue.redis_queue import RedisQueue
 
 
 def test_redis_connection() -> bool:
@@ -49,18 +50,18 @@ def test_enqueue_task() -> bool:
     """Test task enqueueing."""
     print("\nTesting task enqueueing...")
     try:
-        queue_client = get_queue_client()
+        queue = RedisQueue(get_redis_connection())
 
         # Test enqueue to CPU queue
         test_video_id = uuid4()
         print(f"Enqueueing transcode task for video_id: {test_video_id}")
-        job = queue_client.enqueue_transcode_task(test_video_id)
-        print(f"✓ Task enqueued to CPU queue. Job ID: {job.id}")
+        job_id = queue.publish(Stage.TRANSCODE, test_video_id)
+        print(f"✓ Task enqueued to CPU queue. Job ID: {job_id}")
 
         # Test enqueue to GPU queue
         print(f"Enqueueing pose task for video_id: {test_video_id}")
-        job = queue_client.enqueue_pose_task(test_video_id)
-        print(f"✓ Task enqueued to GPU queue. Job ID: {job.id}")
+        job_id = queue.publish(Stage.POSE, test_video_id)
+        print(f"✓ Task enqueued to GPU queue. Job ID: {job_id}")
 
         return True
     except Exception as e:

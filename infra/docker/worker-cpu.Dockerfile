@@ -13,14 +13,14 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir uv
 
 # Copy dependency files
-COPY workers/pyproject.toml workers/uv.lock* ./
+COPY backend/pyproject.toml backend/uv.lock* ./
 
 # Install Python dependencies
-RUN uv pip install --system -e .
+RUN uv pip install --system -e ".[workers-cpu]"
 
 
-# Copy workers code
-COPY workers/ ./workers/
+# Copy backend (includes workers)
+COPY backend/ ./backend/
 COPY contracts/ ./contracts/
 COPY rules/ ./rules/
 COPY schemas/ ./schemas/
@@ -30,4 +30,3 @@ ENV PYTHONPATH=/app
 
 # Run RQ worker for CPU queue
 CMD ["sh", "-c", "rq worker --url ${REDIS_URL:-redis://redis:6379/0} cpu"]
-

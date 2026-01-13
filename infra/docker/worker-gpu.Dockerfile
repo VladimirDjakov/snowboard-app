@@ -23,13 +23,13 @@ WORKDIR /app
 RUN pip install --no-cache-dir uv
 
 # Copy dependency files
-COPY workers/pyproject.toml workers/uv.lock* workers/pyproject.toml* ./
+COPY backend/pyproject.toml backend/uv.lock* ./
 
 # Install Python dependencies
-RUN uv pip install --system -e .
+RUN uv pip install --system -e ".[workers-gpu]"
 
-# Copy workers code
-COPY workers/ ./workers/
+# Copy backend (includes workers)
+COPY backend/ ./backend/
 COPY contracts/ ./contracts/
 COPY rules/ ./rules/
 COPY schemas/ ./schemas/
@@ -39,4 +39,3 @@ ENV PYTHONPATH=/app
 
 # Run RQ worker for GPU queue
 CMD ["sh", "-c", "rq worker --url ${REDIS_URL:-redis://redis:6379/0} gpu"]
-
