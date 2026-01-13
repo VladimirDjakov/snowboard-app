@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 
-from backend.app.clients.queue import get_queue_client
-from backend.app.clients.redis import check_redis_health, get_redis_connection
+from backend.app.adapters.redis import QueueClient
+from backend.app.adapters.redis.client import check_redis_health, get_redis_connection
 
 
 def test_redis_connection() -> bool:
@@ -49,7 +49,7 @@ def test_enqueue_task() -> bool:
     """Test task enqueueing."""
     print("\nTesting task enqueueing...")
     try:
-        queue_client = get_queue_client()
+        queue_client = QueueClient(get_redis_connection())
 
         # Test enqueue to CPU queue
         test_video_id = uuid4()

@@ -8,8 +8,8 @@ from rq import Queue
 from rq.exceptions import InvalidJobOperation
 from rq.job import Job
 
-from backend.app.clients import queue as queue_module
-from backend.app.clients.queue import QueueClient, QueueName, get_queue_client
+from backend.app.adapters.redis import QueueClient
+from backend.app.adapters.redis.queue_client import QueueName
 
 
 class TestQueueClient:
@@ -25,8 +25,8 @@ class TestQueueClient:
     def test_enqueue_task_with_valid_cpu_queue(self):
         """Test enqueue_task with valid CPU queue."""
         with (
-            patch("backend.app.clients.queue.Queue") as mock_queue_class,
-            patch("backend.app.clients.queue.logging.getLogger") as mock_get_logger,
+            patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class,
+            patch("backend.app.adapters.redis.queue_client.logging.getLogger") as mock_get_logger,
         ):
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
@@ -47,7 +47,7 @@ class TestQueueClient:
 
     def test_enqueue_task_with_valid_gpu_queue(self):
         """Test enqueue_task with valid GPU queue."""
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_job = MagicMock(spec=Job)
@@ -71,7 +71,7 @@ class TestQueueClient:
 
     def test_enqueue_task_handles_callable_task_func(self):
         """Test enqueue_task with callable task function."""
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
 
             def test_task():
@@ -92,8 +92,8 @@ class TestQueueClient:
     def test_enqueue_task_logs_correctly(self):
         """Test that enqueue_task logs correctly."""
         with (
-            patch("backend.app.clients.queue.Queue") as mock_queue_class,
-            patch("backend.app.clients.queue.logging.getLogger") as mock_get_logger,
+            patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class,
+            patch("backend.app.adapters.redis.queue_client.logging.getLogger") as mock_get_logger,
         ):
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
@@ -118,7 +118,7 @@ class TestQueueClient:
         """Test enqueue_transcode_task helper method."""
         video_id = uuid4()
 
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_job = MagicMock(spec=Job)
@@ -138,7 +138,7 @@ class TestQueueClient:
         """Test enqueue_pose_task helper method."""
         video_id = uuid4()
 
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_job = MagicMock(spec=Job)
@@ -159,7 +159,7 @@ class TestQueueClient:
         """Test enqueue_features_task helper method."""
         video_id = uuid4()
 
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_job = MagicMock(spec=Job)
@@ -179,7 +179,7 @@ class TestQueueClient:
         """Test enqueue_feedback_task helper method."""
         video_id = uuid4()
 
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_job = MagicMock(spec=Job)
@@ -197,7 +197,7 @@ class TestQueueClient:
 
     def test_enqueue_task_propagates_invalid_job_operation(self):
         """Test that InvalidJobOperation is propagated from queue.enqueue."""
-        with patch("backend.app.clients.queue.Queue") as mock_queue_class:
+        with patch("backend.app.adapters.redis.queue_client.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
             mock_queue.enqueue.side_effect = InvalidJobOperation("Invalid job")
@@ -207,40 +207,3 @@ class TestQueueClient:
 
             with pytest.raises(InvalidJobOperation, match="Invalid job"):
                 client.enqueue_task(QueueName.CPU, "test.task")
-
-
-class TestGetQueueClient:
-    """Tests for get_queue_client function."""
-
-    def test_creates_client_on_first_call(self):
-        """Test that client is created on first call."""
-        # Reset singleton
-        queue_module._queue_client = None
-
-        with patch("backend.app.clients.redis.get_redis_connection") as mock_get_conn:
-            mock_conn = MagicMock()
-            mock_get_conn.return_value = mock_conn
-
-            result = get_queue_client()
-
-            assert result is not None
-            assert isinstance(result, QueueClient)
-            assert result._redis_conn is mock_conn
-
-    def test_returns_cached_client_on_subsequent_calls(self):
-        """Test that subsequent calls return cached client."""
-        # Reset singleton
-        queue_module._queue_client = None
-
-        with patch("backend.app.clients.redis.get_redis_connection") as mock_get_conn:
-            mock_conn = MagicMock()
-            mock_get_conn.return_value = mock_conn
-
-            # First call
-            client1 = get_queue_client()
-            # Second call
-            client2 = get_queue_client()
-
-            assert client1 is client2
-            # get_redis_connection should be called only once due to singleton
-            assert mock_get_conn.call_count == 1

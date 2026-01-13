@@ -18,16 +18,23 @@ if "DATABASE_URL" in os.environ:
 # ruff: noqa
 from sqlalchemy import text
 
-from backend.app.db.models import (
+from backend.app.domain.analysis_job import Stage, StageStatus
+from backend.app.domain.value_objects import ArtifactKind
+from backend.app.infrastructure.postgres.orm_models import (
     Artifact,
-    ArtifactKind,
     JobStage,
-    JobStageName,
-    JobStageStatus,
     Video,
     VideoStatus,
 )
-from backend.app.db.session import SessionLocal, engine
+from backend.app.composition.settings import load_settings
+from backend.app.infrastructure.postgres.session import (
+    create_engine_from_settings,
+    create_sessionmaker_from_engine,
+)
+
+settings = load_settings()
+engine = create_engine_from_settings(settings)
+SessionLocal = create_sessionmaker_from_engine(engine)
 
 
 def print_separator():
@@ -82,23 +89,23 @@ def main():
         stages = [
             JobStage(
                 video_id=video.id,
-                name=JobStageName.TRANSCODE,
-                status=JobStageStatus.PENDING,
+                name=Stage.TRANSCODE,
+                status=StageStatus.PENDING,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.POSE,
-                status=JobStageStatus.PENDING,
+                name=Stage.POSE,
+                status=StageStatus.PENDING,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.FEATURES,
-                status=JobStageStatus.PENDING,
+                name=Stage.FEATURES,
+                status=StageStatus.PENDING,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.FEEDBACK,
-                status=JobStageStatus.PENDING,
+                name=Stage.FEEDBACK,
+                status=StageStatus.PENDING,
             ),
         ]
 
@@ -168,18 +175,18 @@ def main():
         # Обновляем стадию
         transcode_stage = (
             db.query(JobStage)
-            .filter(JobStage.video_id == video.id, JobStage.name == JobStageName.TRANSCODE)
+            .filter(JobStage.video_id == video.id, JobStage.name == Stage.TRANSCODE)
             .first()
         )
 
         if transcode_stage:
-            transcode_stage.status = JobStageStatus.RUNNING
+            transcode_stage.status = StageStatus.RUNNING
             transcode_stage.started_at = datetime.now(UTC)
             db.commit()
             print(f"✓ Стадия {transcode_stage.name.value}: {transcode_stage.status.value}")
             print(f"  Начало: {transcode_stage.started_at}")
 
-            transcode_stage.status = JobStageStatus.DONE
+            transcode_stage.status = StageStatus.DONE
             transcode_stage.ended_at = datetime.now(UTC)
             video.status = VideoStatus.PROCESSING
             db.commit()
@@ -199,7 +206,7 @@ def main():
         print(f"✓ Видео в обработке: {len(processing_videos)}")
 
         # Поиск стадий
-        running_stages = db.query(JobStage).filter(JobStage.status == JobStageStatus.RUNNING).all()
+        running_stages = db.query(JobStage).filter(JobStage.status == StageStatus.RUNNING).all()
         print(f"✓ Запущенных стадий: {len(running_stages)}")
 
         print_separator()

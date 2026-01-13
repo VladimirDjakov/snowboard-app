@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from redis.exceptions import ConnectionError, RedisError
 
-from backend.app.clients import redis as redis_module
+from backend.app.adapters.redis import client as redis_module
+from backend.app.composition.settings import Settings
 
 
 class TestGetRedisConnection:
@@ -17,10 +18,14 @@ class TestGetRedisConnection:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
@@ -37,10 +42,14 @@ class TestGetRedisConnection:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
@@ -60,10 +69,14 @@ class TestGetRedisConnection:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_from_url.side_effect = ConnectionError("Connection failed")
 
             with pytest.raises(ConnectionError, match="Connection failed"):
@@ -75,10 +88,14 @@ class TestGetRedisConnection:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.side_effect = RedisError("Ping failed")
             mock_from_url.return_value = mock_conn
@@ -92,11 +109,15 @@ class TestGetRedisConnection:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
             test_url = "redis://test-host:6380/1"
-            mock_settings.redis_url = test_url
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url=test_url,
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
@@ -121,10 +142,14 @@ class TestCheckRedisHealth:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
@@ -141,10 +166,14 @@ class TestCheckRedisHealth:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_from_url.side_effect = ConnectionError("Connection failed")
 
             result = redis_module.check_redis_health()
@@ -157,10 +186,14 @@ class TestCheckRedisHealth:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.side_effect = RedisError("Ping failed")
             mock_from_url.return_value = mock_conn
@@ -175,10 +208,14 @@ class TestCheckRedisHealth:
         redis_module._redis_client = None
 
         with (
-            patch("backend.app.clients.redis.redis.from_url") as mock_from_url,
-            patch("backend.app.core.config.settings") as mock_settings,
+            patch("backend.app.adapters.redis.client.redis.from_url") as mock_from_url,
+            patch("backend.app.composition.settings.load_settings") as mock_load_settings,
         ):
-            mock_settings.redis_url = "redis://localhost:6379/0"
+            mock_settings = Settings(
+                database_url="postgresql://user:pass@localhost/db",
+                redis_url="redis://localhost:6379/0",
+            )
+            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.side_effect = RedisError("Ping failed")
             mock_from_url.return_value = mock_conn

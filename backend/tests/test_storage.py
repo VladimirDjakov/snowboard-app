@@ -7,13 +7,11 @@ import pytest
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from backend.app.api.schemas.videos import UploadInfo
-from backend.app.core.config import Settings
-from backend.app.services.storage import get_storage
-from backend.app.storage import create_storage_backend
-from backend.app.storage.base import BaseStorage
-from backend.app.storage.local import LocalStorage
-from backend.app.storage.s3 import S3Storage
+from backend.app.adapters.storage import create_storage_backend
+from backend.app.adapters.storage.local import LocalStorage
+from backend.app.adapters.storage.s3 import S3Storage
+from backend.app.application.ports.storage import PresignedUploadUrl
+from backend.app.composition.settings import Settings
 
 
 class TestLocalStorage:
@@ -43,7 +41,7 @@ class TestLocalStorage:
         assert file_path.parent.exists()
 
         # Check UploadInfo
-        assert isinstance(upload_info, UploadInfo)
+        assert isinstance(upload_info, PresignedUploadUrl)
         assert upload_info.method == "PUT"
         assert upload_info.object_key == object_key
         assert upload_info.expires_in_sec == 3600
@@ -118,7 +116,7 @@ class TestS3Storage:
     @pytest.fixture
     def mock_boto3_client(self):
         """Create a mock boto3 S3 client."""
-        with patch("backend.app.storage.s3.boto3") as mock_boto3:
+        with patch("backend.app.adapters.storage.s3.boto3") as mock_boto3:
             mock_client = MagicMock()
             mock_boto3.client.return_value = mock_client
             yield mock_client
@@ -137,7 +135,7 @@ class TestS3Storage:
 
     def test_init_raises_import_error_without_boto3(self):
         """Test that initialization raises ImportError if boto3 is not available."""
-        with patch("backend.app.storage.s3.boto3", None):
+        with patch("backend.app.adapters.storage.s3.boto3", None):
             with pytest.raises(ImportError, match="boto3 is required"):
                 S3Storage(
                     endpoint_url="http://localhost:9000",
@@ -175,7 +173,7 @@ class TestS3Storage:
         assert call_kwargs[1]["ExpiresIn"] == 3600
 
         # Verify UploadInfo
-        assert isinstance(upload_info, UploadInfo)
+        assert isinstance(upload_info, PresignedUploadUrl)
         assert upload_info.method == "PUT"
         assert upload_info.url == "https://s3.example.com/presigned-url"
         assert upload_info.headers["Content-Type"] == "video/mp4"
@@ -315,7 +313,7 @@ class TestStorageFactory:
             s3_bucket_name="test-bucket",
         )
 
-        with patch("backend.app.storage.s3.boto3"):
+        with patch("backend.app.adapters.storage.s3.boto3"):
             backend = create_storage_backend(settings)
             assert isinstance(backend, S3Storage)
             assert backend.bucket_name == "test-bucket"
@@ -340,44 +338,3 @@ class TestStorageFactory:
                 redis_url="redis://localhost:6379/0",
                 storage_backend="unknown",  # type: ignore
             )
-
-
-class TestStorageHelper:
-    """Tests for get_storage helper."""
-
-    def test_get_storage_singleton(self):
-        """Test that get_storage returns same instance (singleton)."""
-        # Reset singleton
-        import backend.app.services.storage as storage_module
-
-        storage_module._storage_instance = None
-
-        # Mock settings
-        with patch("backend.app.core.config.settings") as mock_settings:
-            mock_settings.storage_backend = "local"
-            mock_settings.storage_local_path = "runtime/storage"
-            mock_settings.api_host = "localhost"
-            mock_settings.api_port = 8000
-
-            storage1 = get_storage()
-            storage2 = get_storage()
-
-            assert storage1 is storage2
-
-    def test_get_storage_creates_backend(self):
-        """Test that get_storage creates backend from settings."""
-        # Reset singleton
-        import backend.app.services.storage as storage_module
-
-        storage_module._storage_instance = None
-
-        # Mock settings
-        with patch("backend.app.core.config.settings") as mock_settings:
-            mock_settings.storage_backend = "local"
-            mock_settings.storage_local_path = "runtime/storage"
-            mock_settings.api_host = "localhost"
-            mock_settings.api_port = 8000
-
-            storage = get_storage()
-
-            assert isinstance(storage, BaseStorage)

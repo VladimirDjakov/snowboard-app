@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config import Settings
+from backend.app.composition.settings import Settings
 
 
 @pytest.fixture

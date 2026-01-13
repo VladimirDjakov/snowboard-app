@@ -2,8 +2,8 @@
 
 import logging
 
-from backend.app.core.config import Settings
-from backend.app.core.logging import setup_logging
+from backend.app.composition.settings import Settings
+from backend.app.infrastructure.logging import setup_logging
 
 
 def test_logging_setup_json_format():

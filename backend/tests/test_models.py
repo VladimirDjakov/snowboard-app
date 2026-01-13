@@ -8,16 +8,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.app.db.models import (
+from backend.app.domain.analysis_job import Stage, StageStatus
+from backend.app.domain.value_objects import ArtifactKind
+from backend.app.infrastructure.postgres.orm_models import (
     Artifact,
-    ArtifactKind,
     JobStage,
-    JobStageName,
-    JobStageStatus,
     Video,
     VideoStatus,
 )
-from backend.app.db.session import Base
+from backend.app.infrastructure.postgres.session import Base
 
 
 @pytest.fixture
@@ -135,8 +134,8 @@ class TestVideo:
         # Create a stage
         stage = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.TRANSCODE,
-            status=JobStageStatus.PENDING,
+            name=Stage.TRANSCODE,
+            status=StageStatus.PENDING,
         )
         test_session.add(stage)
 
@@ -152,7 +151,7 @@ class TestVideo:
 
         # Test relationships
         assert len(sample_video.stages) == 1
-        assert sample_video.stages[0].name == JobStageName.TRANSCODE
+        assert sample_video.stages[0].name == Stage.TRANSCODE
         assert len(sample_video.artifacts) == 1
         assert sample_video.artifacts[0].kind == ArtifactKind.ORIGINAL
 
@@ -164,16 +163,16 @@ class TestJobStage:
         """Test creating a job stage."""
         stage = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.TRANSCODE,
-            status=JobStageStatus.PENDING,
+            name=Stage.TRANSCODE,
+            status=StageStatus.PENDING,
         )
         test_session.add(stage)
         test_session.commit()
 
         assert stage.id is not None
         assert stage.video_id == sample_video.id
-        assert stage.name == JobStageName.TRANSCODE
-        assert stage.status == JobStageStatus.PENDING
+        assert stage.name == Stage.TRANSCODE
+        assert stage.status == StageStatus.PENDING
         assert stage.started_at is None
         assert stage.ended_at is None
         assert stage.error_message is None
@@ -184,8 +183,8 @@ class TestJobStage:
         """Test that (video_id, name) must be unique."""
         stage1 = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.TRANSCODE,
-            status=JobStageStatus.PENDING,
+            name=Stage.TRANSCODE,
+            status=StageStatus.PENDING,
         )
         test_session.add(stage1)
         test_session.commit()
@@ -193,8 +192,8 @@ class TestJobStage:
         # Try to create duplicate
         stage2 = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.TRANSCODE,  # Same name
-            status=JobStageStatus.QUEUED,
+            name=Stage.TRANSCODE,  # Same name
+            status=StageStatus.QUEUED,
         )
         test_session.add(stage2)
 
@@ -205,35 +204,35 @@ class TestJobStage:
         """Test job stage status transitions."""
         stage = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.POSE,
-            status=JobStageStatus.PENDING,
+            name=Stage.POSE,
+            status=StageStatus.PENDING,
         )
         test_session.add(stage)
         test_session.commit()
 
         # Test status updates with timestamps
-        stage.status = JobStageStatus.QUEUED
+        stage.status = StageStatus.QUEUED
         test_session.commit()
-        assert stage.status == JobStageStatus.QUEUED
+        assert stage.status == StageStatus.QUEUED
 
-        stage.status = JobStageStatus.RUNNING
+        stage.status = StageStatus.RUNNING
         stage.started_at = datetime.now(UTC)
         test_session.commit()
-        assert stage.status == JobStageStatus.RUNNING
+        assert stage.status == StageStatus.RUNNING
         assert stage.started_at is not None
 
-        stage.status = JobStageStatus.DONE
+        stage.status = StageStatus.DONE
         stage.ended_at = datetime.now(UTC)
         test_session.commit()
-        assert stage.status == JobStageStatus.DONE
+        assert stage.status == StageStatus.DONE
         assert stage.ended_at is not None
 
     def test_job_stage_versioning_fields(self, test_session: Session, sample_video: Video):
         """Test optional versioning fields."""
         stage = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.POSE,
-            status=JobStageStatus.PENDING,
+            name=Stage.POSE,
+            status=StageStatus.PENDING,
             pipeline_version="mvp_v1",
             model_version="v1",
         )
@@ -247,14 +246,14 @@ class TestJobStage:
         """Test error message for failed stages."""
         stage = JobStage(
             video_id=sample_video.id,
-            name=JobStageName.FEATURES,
-            status=JobStageStatus.FAILED,
+            name=Stage.FEATURES,
+            status=StageStatus.FAILED,
             error_message="Processing failed: out of memory",
         )
         test_session.add(stage)
         test_session.commit()
 
-        assert stage.status == JobStageStatus.FAILED
+        assert stage.status == StageStatus.FAILED
         assert stage.error_message == "Processing failed: out of memory"
 
     def test_job_stage_cascade_delete(self, test_session: Session):
@@ -269,8 +268,8 @@ class TestJobStage:
 
         stage = JobStage(
             video_id=video.id,
-            name=JobStageName.TRANSCODE,
-            status=JobStageStatus.PENDING,
+            name=Stage.TRANSCODE,
+            status=StageStatus.PENDING,
         )
         test_session.add(stage)
         test_session.commit()
@@ -421,23 +420,23 @@ class TestModelRelationships:
         stages = [
             JobStage(
                 video_id=video.id,
-                name=JobStageName.TRANSCODE,
-                status=JobStageStatus.DONE,
+                name=Stage.TRANSCODE,
+                status=StageStatus.DONE,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.POSE,
-                status=JobStageStatus.RUNNING,
+                name=Stage.POSE,
+                status=StageStatus.RUNNING,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.FEATURES,
-                status=JobStageStatus.PENDING,
+                name=Stage.FEATURES,
+                status=StageStatus.PENDING,
             ),
             JobStage(
                 video_id=video.id,
-                name=JobStageName.FEEDBACK,
-                status=JobStageStatus.PENDING,
+                name=Stage.FEEDBACK,
+                status=StageStatus.PENDING,
             ),
         ]
 
@@ -448,10 +447,10 @@ class TestModelRelationships:
 
         assert len(video.stages) == 4
         assert {stage.name for stage in video.stages} == {
-            JobStageName.TRANSCODE,
-            JobStageName.POSE,
-            JobStageName.FEATURES,
-            JobStageName.FEEDBACK,
+            Stage.TRANSCODE,
+            Stage.POSE,
+            Stage.FEATURES,
+            Stage.FEEDBACK,
         }
 
     def test_video_with_multiple_artifacts(self, test_session: Session):
@@ -540,8 +539,8 @@ class TestModelRelationships:
         # Create transcode stage
         transcode_stage = JobStage(
             video_id=video.id,
-            name=JobStageName.TRANSCODE,
-            status=JobStageStatus.QUEUED,
+            name=Stage.TRANSCODE,
+            status=StageStatus.QUEUED,
         )
         test_session.add(transcode_stage)
 
@@ -550,7 +549,7 @@ class TestModelRelationships:
         test_session.commit()
 
         # Simulate transcode completion
-        transcode_stage.status = JobStageStatus.RUNNING
+        transcode_stage.status = StageStatus.RUNNING
         transcode_stage.started_at = datetime.now(UTC)
         test_session.commit()
 
@@ -562,7 +561,7 @@ class TestModelRelationships:
         )
         test_session.add(normalized_artifact)
 
-        transcode_stage.status = JobStageStatus.DONE
+        transcode_stage.status = StageStatus.DONE
         transcode_stage.ended_at = datetime.now(UTC)
         test_session.commit()
 
@@ -570,4 +569,4 @@ class TestModelRelationships:
         assert len(video.stages) == 1
         assert len(video.artifacts) == 2
         assert video.status == VideoStatus.PROCESSING
-        assert transcode_stage.status == JobStageStatus.DONE
+        assert transcode_stage.status == StageStatus.DONE
