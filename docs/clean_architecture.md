@@ -8,7 +8,7 @@
 backend/app/
 ├── domain/              # Доменные модели и бизнес-правила
 │   ├── analysis_job.py # AnalysisJob, Stage, статусы, инварианты
-│   └── value_objects.py # VideoRef, ModelSignature, ArtifactRef
+│   └── value_objects.py # ArtifactKind, ArtifactRef
 │
 ├── application/         # Application Layer
 │   ├── ports/           # Интерфейсы (Protocol)
@@ -26,14 +26,17 @@ backend/app/
 │
 ├── adapters/            # Adapters Layer (реализации портов)
 │   ├── postgres/        # PostgresJobRepo, PostgresUnitOfWork
+│   │   ├── job_repo.py      # PostgresJobRepo
+│   │   ├── video_repo.py    # PostgresVideoRepo
+│   │   └── uow.py           # PostgresUnitOfWork
 │   ├── redis/           # RedisQueue
 │   ├── storage/         # StorageArtifactStore
 │   └── clock/           # SystemClock
 │
 ├── infrastructure/      # Infrastructure Layer
-│   ├── postgres/        # ORM модели, сессии, миграции
-│   │   ├── orm_models.py    # Video, JobStage, Artifact
+│   ├── postgres/        # Сессии, миграции, конфигурация БД, ORM модели
 │   │   ├── session.py       # SQLAlchemy session factory
+│   │   ├── orm_models.py    # Video, JobStage, Artifact (ORM модели)
 │   │   └── migrations/      # Alembic миграции
 │   └── logging.py       # Структурированное логирование
 │
@@ -49,6 +52,7 @@ backend/app/
 3. **Разделение lifecycle'ов**: upload (Video) и analysis (AnalysisJob) - разные сущности
 4. **Защита от конкуренции**: optimistic locking через `version`, pessimistic через `lock_job()`
 5. **Идемпотентность**: доменные методы проверяют состояние перед изменением
+6. **Dependency Rule**: зависимости идут только внутрь (Domain ← Application ← Adapters ← Infrastructure)
 
 ## Схема взаимодействий
 
@@ -186,20 +190,38 @@ graph TB
 - Если стадия уже DONE, повторный вызов — no-op
 - `HandleStageCompleted` проверяет статус перед обработкой
 
-## Отличия от старой архитектуры
+## Архитектурные решения и компромиссы
 
-### До (services/)
+### Dependency Rule и размещение ORM моделей
 
-- Бизнес-логика смешана с инфраструктурой
-- Прямые импорты SQLAlchemy/Redis в бизнес-логике
-- Сложно тестировать изолированно
+**Проблема:** В строгой чистой архитектуре зависимости должны идти только внутрь:
+```
+Domain ← Application ← Adapters ← Infrastructure
+```
 
-### После (Clean-lite)
+**Текущая структура (компромисс):**
+- ORM модели находятся в `infrastructure/postgres/orm_models.py`
+- Адаптеры (`adapters/postgres/`) импортируют их из Infrastructure
+- Это создает зависимость наружу: `Adapters → Infrastructure` ⚠️
+
+**Обоснование компромисса:**
+1. ✅ **Логическая связность**: ORM модели - это инфраструктурные детали (SQLAlchemy, PostgreSQL)
+2. ✅ **Практичность**: ORM модели используются миграциями Alembic, которые находятся в Infrastructure
+3. ✅ **Естественное размещение**: ORM модели логически относятся к инфраструктуре БД, а не к адаптерам
+4. ⚠️ **Компромисс**: Нарушение строгой Dependency Rule, но это позволяет значительно упростить код, реализовав адаптеры на прямую для PosrgresSQL, без добавления лишних абстракций для ORM моделей.
+
+**Альтернативные подходы (рассматривались, но отклонены):**
+- Размещение ORM моделей в Adapters: нарушает логическую связность (модели - это инфра, а не адаптер)
+- Создание абстракции для ORM моделей: усложняет код без реальной пользы
+- Dependency Injection для моделей: не практичен в Python для ORM
+
+### Clean-lite:
 
 - Domain и Application изолированы от инфраструктуры
 - Порты позволяют легко мокировать для тестов
 - Use cases содержат только оркестрацию
 - Инварианты живут в domain моделях
+- ORM модели в Infrastructure (компромисс для практичности)
 
 ## Использование
 

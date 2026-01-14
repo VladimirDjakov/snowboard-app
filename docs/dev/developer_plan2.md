@@ -72,7 +72,7 @@ todos:
 
 ### Слои и зависимости (внутрь)
 
-- **Domain**: `AnalysisJob`, статусы/переходы, `VideoRef`, `ModelSignature`.
+- **Domain**: `AnalysisJob`, статусы/переходы, `ArtifactKind`, `ArtifactRef`.
 - **Application (Use Cases)**: `StartAnalysis`, `HandleStageCompleted`, `FinalizeAnalysis`, `FailAnalysis`, (и read-only use cases для API: `GetStatus`, `ListArtifacts`).
 - **Ports** (интерфейсы): `JobRepo`, `Queue`, `ArtifactStore`, `InferenceClient`, `Clock`.
 - **Adapters**: реализации портов для Postgres/Redis/Storage/Triton.
