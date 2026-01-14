@@ -37,25 +37,101 @@ make test
 
 ---
 
+## 🧪 Ручное тестирование API
+
+Ниже — два способа поднять API и руками проверить основные эндпоинты.
+
+### Вариант 1 (рекомендуется): поднять всё через Docker Compose
+
+1) **Проверить, что API живое**
+
+```bash
+curl -i http://localhost:8000/health
+curl -i http://localhost:8000/health/ready
+```
+
+2) **Открыть Swagger UI**
+
+- Swagger UI: `http://localhost:8000/docs`
+- OpenAPI JSON: `http://localhost:8000/openapi.json`
+
+3) **Пример ручного теста эндпоинтов видео**
+
+Создать видео:
+
+```bash
+curl -i -X POST "http://localhost:8000/v1/videos" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"test.mp4","content_type":"video/mp4","size_bytes":12345}'
+```
+
+Из ответа возьмите `video_id`, `share_token` и `upload.url`.
+
+Загрузить файл по `upload.url` (пример с локальным файлом `./test.mp4`):
+
+```bash
+curl -i -X PUT "<upload_url>" \
+  -H "Content-Type: video/mp4" \
+  --data-binary "@test.mp4"
+```
+
+Завершить загрузку:
+
+```bash
+curl -i -X POST "http://localhost:8000/v1/videos/<video_id>/complete-upload" \
+  -H "Content-Type: application/json" \
+  -d '{"share_token":"<share_token>"}'
+```
+
+Получить статус:
+
+```bash
+curl -i "http://localhost:8000/v1/videos/<video_id>?share_token=<share_token>"
+```
+
+Получить артефакты:
+
+```bash
+curl -i "http://localhost:8000/v1/videos/<video_id>/artifacts?share_token=<share_token>"
+```
+
+### Вариант 2: поднять только API локально (без Docker), но с поднятыми зависимостями
+
+1) **Поднять Postgres/Redis**
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres redis
+```
+
+2) **Запустить API локально через uvicorn** (из корня репо)
+
+```bash
+uv run --directory backend uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Важно: при этом `DATABASE_URL`/`REDIS_URL` должны указывать на `localhost`, а не на `postgres`/`redis` (как внутри compose). Проще всего — выставить их в окружении перед запуском или в `.env`.
+
+---
+
 ## 📊 Диаграммы архитектуры
 
 ### Общий пайплайн обработки видео
 
 ```
 ┌──────────────────┐    Upload Complete    ┌──────────────────┐
-│ 📤 Загрузка видео│ ───────────────────>  │ 🎬 Transcode     │
+│ 📤 Загрузка видео│ ───────────────────>  │ 🎬 Transcode      │
 │                  │                       │ Нормализация     │
 └──────────────────┘                       └────────┬─────────┘
                                                     │ Normalized Video
                                                     ▼
 ┌──────────────────┐    Keypoints          ┌───────────────────┐
-│ 📊 Feature       │ <───────────────────  │ 🧠 Pose Inference │
+│ 📊 Feature       │ <───────────────────  │ 🧠 Pose tracking   │
 │ Extraction       │                       │                   │
 └────────┬─────────┘                       └───────────────────┘
          │ Features
          ▼                                         
 ┌──────────────────┐    Complete          ┌────────────────────┐
-│ 💬 Rule-based    │ ──────────────────>  │ ✅ Готово          │
+│ 🧾 Rule-based    │ ──────────────────>  │ ✅ Готово           │
 │ Feedback         │                      │                    │
 │ Генерация фидбека│                      └────────────────────┘
 └──────────────────┘
@@ -110,7 +186,7 @@ make test
 📮 Queue ──Задача features──> 💻 Features Worker
                                    │
                                    ├─> 📦 Storage (чтение keypoints_v1.jsonl)
-                                   ├─> Вычисление фич
+                                   ├─> 📊 Вычисление фич
                                    ├─> 📦 Storage (сохранение features_v1.json)
                                    ├─> 🗄️ Database (обновление статуса)
                                    └─> 📮 Queue (задача feedback)
@@ -118,7 +194,7 @@ make test
 📮 Queue ──Задача feedback──> 💻 Feedback Worker
                                   │
                                   ├─> 📦 Storage (чтение features_v1.json)
-                                  ├─> Применение правил
+                                  ├─> 🧾 Применение правил
                                   ├─> 📦 Storage (сохранение feedback_v1.json)
                                   └─> 🗄️ Database (статус: completed)
 ```
@@ -197,18 +273,20 @@ make test
 - **`components/FeedbackPanel.tsx`** — отображение rule‑based фидбека
 - **`lib/api.ts`** — типизированный клиент API
 
-### 🔧 `backend/` — FastAPI‑приложение
+### 🔧 `backend/` — FastAPI‑приложение (Clean Architecture)
 
 - **`app/main.py`** — точка входа, подключение маршрутов и middleware
-- **`app/api/routes/videos.py`** — эндпоинты для создания видео, завершения загрузки, получения статуса и артефактов
-- **`app/api/schemas/`** — Pydantic‑схемы (DTO)
-- **`app/db/`** — модели таблиц (Video, JobStage, Artifact), сессия и миграции (Alembic)
-- **`app/services/storage.py`** — генерация presigned URL и работа с MinIO/S3
-- **`app/services/jobs.py`** — постановка задач в очередь и переходы стадий
-- **`app/services/progress.py`** — чтение прогресса из Redis и БД
-- **`app/services/model_registry.py`** — проверка наличия модели и чтение манифеста
+- **`app/presentation/api/routes/videos.py`** — эндпоинты для создания видео, завершения загрузки, получения статуса и артефактов
+- **`app/presentation/api/schemas/`** — Pydantic‑схемы (DTO)
+- **`app/domain/`** — доменные модели и бизнес-правила (AnalysisJob, ValueObjects)
+- **`app/application/use_cases/`** — use cases для оркестрации бизнес-логики
+- **`app/application/interfaces/`** — интерфейсы (Protocol) для зависимостей
+- **`app/infrastructure/`** — реализации интерфейсов (PostgresJobRepo, RedisQueue, Storage)
+- **`app/infrastructure/postgres/`** — ORM модели (Video, JobStage, Artifact), сессии и миграции (Alembic)
+- **`app/infrastructure/logging.py`** — структурированное логирование
+- **`app/presentation/bootstrap/`** — dependency injection (Container, Settings)
 
-### ⚙️ `backend/app/infrastructure/workers/` — асинхронные воркеры
+### ⚙️ `backend/app/presentation/workers/` — асинхронные воркеры
 
 - **`common/`** — общие утилиты: конфиг, логирование, работа с хранилищем, обновление прогресса
 - **`queue/`** — регистрация задач и точка входа для RQ‑воркеров

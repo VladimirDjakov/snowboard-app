@@ -45,7 +45,7 @@ todos:
 Этот план продолжает развитие **workers-пайплайна** с соблюдением Clean Architecture:
 - доменная логика и переходы стадий живут в `backend/app/domain/` и `backend/app/application/`;
 - воркеры - тонкие consumers: читают артефакты, вызывают use cases, публикуют результаты;
-- инфраструктура (Redis, Postgres, Storage, Triton) скрыта за портами.
+- инфраструктура (Redis, Postgres, Storage, Triton) скрыта за интерфейсами.
 
 Фазы 1-5 считаются завершенными и служат базой для следующих шагов.
 
@@ -58,7 +58,7 @@ todos:
 3. **По пайплайну**: transcode → pose → features → feedback.
 4. **Clean-lite границы**:
    - `domain/` и `application/` не импортируют FastAPI/SQLAlchemy/redis/boto3/tritonclient.
-   - всё общение с внешним миром через **Ports**.
+   - всё общение с внешним миром через **Interfaces**.
 5. **Итеративно**: каждый этап должен быть тестируем отдельно.
 
 ---
@@ -67,10 +67,10 @@ todos:
 
 ### Слои и зависимости (внутрь)
 
-- **Domain**: `AnalysisJob`, статусы/переходы, `VideoRef`, `ModelSignature`.
+- **Domain**: `AnalysisJob`, статусы/переходы, `ArtifactKind`, `Artifact`, `VideoStatus`.
 - **Application (Use Cases)**: `StartAnalysis`, `HandleStageCompleted`, `FinalizeAnalysis`, `FailAnalysis`, (и read-only use cases для API: `GetStatus`, `ListArtifacts`).
-- **Ports** (интерфейсы): `JobRepo`, `Queue`, `ArtifactStore`, `InferenceClient`, `Clock`.
-- **Adapters**: реализации портов для Postgres/Redis/Storage/Triton.
+- **Interfaces** (интерфейсы): `JobRepo`, `Queue`, `Storage`, `InferenceClient`, `Clock`.
+- **Infrastructure**: реализации интерфейсов для Postgres/Redis/Storage/Triton.
 - **FastAPI + worker-consumers**: только вход/выход и вызов use cases.
 
 ---
@@ -88,7 +88,7 @@ todos:
 
 ### 1.2 Конфигурация и логирование
 
-- Реализовать `backend/app/composition/settings.py` (Settings с pydantic-settings).
+- Реализовать `backend/app/presentation/bootstrap/settings.py` (Settings с pydantic-settings).
 - Реализовать `backend/app/infrastructure/logging.py` (структурированное логирование).
 - Реализовать `workers/common/config.py` (общая конфигурация для воркеров).
 - Реализовать `workers/common/logging.py` (логирование для воркеров).
@@ -102,11 +102,11 @@ todos:
 
 ### 2.1 Модели данных
 
-- Реализовать `backend/app/infrastructure/postgres/orm_models.py`:
-  - `Video` (id, status, etc.)
-  - `JobStage` (video_id, name, status, started_at, ended_at)
-  - `Artifact` (video_id, kind, version, object_key)
-- Настроить `backend/app/infrastructure/postgres/session.py` (SQLAlchemy session factory).
+- Реализовать `backend/app/infrastructure/db/orm_models.py`:
+  - `VideoDB` (id, status, etc.) - ORM модель с суффиксом DB
+  - `JobStageDB` (video_id, name, status, started_at, ended_at) - ORM модель с суффиксом DB
+  - `ArtifactDB` (video_id, kind, version, storage_path) - ORM модель с суффиксом DB
+- Настроить `backend/app/infrastructure/db/session.py` (SQLAlchemy session factory).
 - Создать миграции Alembic.
 
 **Зависимости:** фаза 1.2  
@@ -114,7 +114,7 @@ todos:
 
 ### 2.2 Схемы API
 
-- Реализовать `backend/app/api/schemas/videos.py`:
+- Реализовать `backend/app/presentation/api/schemas/videos.py`:
   - `CreateVideoRequest`, `CreateVideoResponse`
   - `VideoStatusResponse`, `ArtifactResponse`
 - Валидация через Pydantic.
@@ -126,12 +126,12 @@ todos:
 
 ## Фаза 3: Storage Backend
 
-### 3.1 Абстракция Storage (как Adapter, но можно начать сейчас)
+### 3.1 Абстракция Storage (реализация интерфейса)
 
-- Создать `backend/app/adapters/storage/base.py` (реализация порта `ArtifactStore` или базовая абстракция).
-- Реализовать `backend/app/adapters/storage/local_store.py` (Local storage для MVP).
-- Реализовать `backend/app/adapters/storage/s3_store.py` (опционально).
-- Фабрика `backend/app/adapters/storage/factory.py` (create store).
+- Создать `backend/app/infrastructure/storage/base.py` (базовая абстракция для реализации интерфейса `Storage`).
+- Реализовать `backend/app/infrastructure/storage/local.py` (Local storage для MVP).
+- Реализовать `backend/app/infrastructure/storage/s3.py` (S3/MinIO storage для production).
+- Интерфейс `Storage` определен в `application/interfaces/storage.py`.
 
 **Зависимости:** фаза 1.2  
 **Тестирование:** unit-тесты upload/download, создание директорий.
@@ -149,16 +149,16 @@ todos:
 
 ### 4.1 Redis клиент
 
-- `backend/app/adapters/redis/redis_client.py` (подключение к Redis).
-- `backend/app/adapters/redis/queue.py` (реализация порта `Queue` поверх RQ/Redis).
+- `backend/app/infrastructure/queue/redis_client.py` (подключение к Redis).
+- `backend/app/infrastructure/queue/redis_queue.py` (реализация интерфейса `Queue` поверх RQ/Redis).
 
 **Зависимости:** фаза 1.2  
 **Тестирование:** подключение, постановка задач.
 
 ### 4.2 Регистрация задач
 
-- `workers/queue/tasks.py` (регистрация/декораторы для задач).
-- `workers/queue/rq_worker.py` (точка входа воркеров).
+- `backend/app/presentation/workers/rq/tasks.py` (регистрация/декораторы для задач).
+- `backend/app/presentation/workers/rq/worker_entrypoint.py` (точка входа воркеров).
 - Очереди: `cpu` и `gpu`.
 
 **Зависимости:** фаза 4.1  
@@ -174,11 +174,11 @@ todos:
 
 В `backend/app/` добавить:
 
-- `domain/`
-- `application/`
-- `application/ports/`
-- `adapters/` (частично уже начнётся в фазах 3–4)
-- `composition/`
+- `domain/` - доменные модели и бизнес-логика
+- `application/` - use cases и интерфейсы
+- `application/interfaces/` - интерфейсы (Protocol) для зависимостей
+- `infrastructure/` - реализации интерфейсов (DB, Storage, Queue, Clock)
+- `presentation/` - API, контроллеры, воркеры, bootstrap
 
 ### 4.5.2 Domain (минимум)
 
@@ -187,32 +187,33 @@ todos:
   - `Stage` (enum: TRANSCODE/POSE/FEATURES/FEEDBACK)
   - `AnalysisJob` (state machine, инварианты)
 - `domain/value_objects.py`
-  - `VideoRef`
-  - `ModelSignature`
+  - `ArtifactKind` (enum: ORIGINAL, NORMALIZED, KEYPOINTS, FEATURES, FEEDBACK)
+  - `Artifact` (value object: kind, version, storage_path)
+  - `VideoStatus` (enum: CREATED, UPLOADED, PROCESSING, DONE, FAILED, CANCELED)
 
 **Минимальные инварианты:**
 - стадии завершаются по порядку;
 - `SUCCEEDED` только после успешного `FEEDBACK`.
 
-### 4.5.3 Ports (интерфейсы)
+### 4.5.3 Interfaces (интерфейсы)
 
-- `application/ports/job_repo.py`: `JobRepo`
-- `application/ports/queue.py`: `Queue`
-- `application/ports/artifact_store.py`: `ArtifactStore`
-- `application/ports/clock.py`: `Clock`
-- `application/ports/uow.py`: `UnitOfWork`
+- `application/interfaces/job_repo.py`: `JobRepo`
+- `application/interfaces/queue.py`: `Queue`
+- `application/interfaces/storage.py`: `Storage`
+- `application/interfaces/clock.py`: `Clock`
+- `application/interfaces/uow.py`: `UnitOfWork`
 
-(Порт `InferenceClient` добавить в фазе 8.)
+(Интерфейс `InferenceClient` добавить в фазе 8.)
 
 ### 4.5.4 Composition root и Infrastructure
 
-- `composition/container.py`:
-  - wiring адаптеров (Postgres/Redis/Storage/Clock)
+- `presentation/bootstrap/container.py`:
+  - wiring реализаций интерфейсов (Postgres/Redis/Storage/Clock)
   - передача их в use cases
-- `composition/settings.py`: Settings с pydantic-settings
-- `infrastructure/postgres/orm_models.py`: ORM модели
-- `infrastructure/postgres/session.py`: SQLAlchemy session factory
-- `infrastructure/postgres/migrations/`: Alembic миграции
+- `presentation/bootstrap/settings.py`: Settings с pydantic-settings
+- `infrastructure/db/orm_models.py`: ORM модели (VideoDB, JobStageDB, ArtifactDB)
+- `infrastructure/db/session.py`: SQLAlchemy session factory
+- `infrastructure/db/migrations/`: Alembic миграции
 - `infrastructure/logging.py`: структурированное логирование
 
 **Тестирование:** import-check: domain/application не тянут инфраструктурные импорты.
@@ -232,7 +233,7 @@ todos:
 - `finalize_analysis.py` → `FinalizeAnalysis`
 - `fail_analysis.py` → `FailAnalysis`
 
-**Важно:** use cases зависят только от `domain` и `ports`.
+**Важно:** use cases зависят только от `domain` и `interfaces`.
 
 ### 5.1 Health checks
 
@@ -254,26 +255,27 @@ todos:
 
 **Зависимости:** 2.1, 2.2, 3.1, 4.1, 5.0
 
-### 5.3 Adapters (вместо backend/app/services/*)
+### 5.3 Infrastructure (реализации интерфейсов)
 
-Сделать реализации портов:
+Сделать реализации интерфейсов:
 
-- `adapters/postgres/job_repo.py` (JobRepo)
-- `adapters/postgres/uow.py` (UnitOfWork)
-- `adapters/redis/queue.py` (Queue)
-- `adapters/storage/artifact_store.py` (ArtifactStore)
-- `adapters/clock/system_clock.py` (Clock)
+- `infrastructure/db/job_repo.py` (JobRepo) - реализация через SQLAlchemy
+- `infrastructure/db/video_repo.py` (VideoRepo) - реализация через SQLAlchemy
+- `infrastructure/db/uow.py` (UnitOfWork) - реализация через SQLAlchemy session
+- `infrastructure/queue/redis_queue.py` (Queue) - реализация через RQ/Redis
+- `infrastructure/storage/local.py` и `infrastructure/storage/s3.py` (Storage)
+- `infrastructure/clock/system_clock.py` (Clock)
 
-**Примечание:** ORM модели находятся в `infrastructure/postgres/orm_models.py`, а не в adapters.
+**Примечание:** ORM модели находятся в `infrastructure/db/orm_models.py` с суффиксом DB (VideoDB, JobStageDB, ArtifactDB).
 
 **Важно:** “progress/artifacts/model_registry” — это либо read-only use cases, либо часть adapter’ов, но не “services”.
 
 ### 5.4 Main application
 
-- `backend/app/main.py`:
+- `backend/app/main.py` или `backend/app/presentation/api/routes/`:
   - подключение роутов
   - middleware (CORS, error handling)
-  - создание контейнера зависимостей (composition)
+  - создание контейнера зависимостей через `presentation/bootstrap/container.py`
 
 
 ---
@@ -290,7 +292,7 @@ todos:
 ### Задачи
 - `backend/app/presentation/bootstrap/runtime.py` (get_session): подключение к БД для воркеров (read/write) и повторное использование настроек.
 - `backend/app/presentation/bootstrap/runtime.py` (get_storage): единый клиент storage (local/S3), совместимый с API.
-- `backend/app/presentation/workers/common/video_io.py`: чтение/запись видео, утилиты для ffmpeg.
+- `backend/app/presentation/workers/common/video_io.py`: чтение/запись видео, утилиты для ffmpeg (использует `storage_path` вместо `object_key`).
 - `backend/app/presentation/workers/common/contracts.py`: загрузка контрактов модели и схем.
 - `backend/app/presentation/workers/common/schemas.py`: валидация артефактов `keypoints_v1.jsonl`, `features_v1.json`, `feedback_v1.json`.
 - `backend/app/presentation/workers/common/progress.py`: единый механизм прогресса/логирования этапов.
@@ -306,10 +308,10 @@ todos:
 
 ### Задачи
 - `backend/app/presentation/workers/cpu/transcode/run.py`:
-  - скачать оригинальное видео из storage;
+  - скачать оригинальное видео из storage по `storage_path`;
   - выполнить нормализацию (ffmpeg);
-  - сохранить `normalized.mp4` в storage;
-  - вызвать `HandleStageCompleted` со стадией `TRANSCODE` и артефактом.
+  - сохранить `normalized_video` в storage (используя `ArtifactKind.NORMALIZED`);
+  - вызвать `HandleStageCompleted` со стадией `TRANSCODE` и артефактом (с `storage_path`).
 - обработка ошибок через `FailAnalysis`.
 - unit/smoke тест обработки малого видео.
 
@@ -323,15 +325,15 @@ todos:
 **Цель:** inference позы и генерация keypoints.
 
 ### Задачи
-- `application/ports/inference_client.py`: порт для inference (если не добавлен ранее).
+- `application/interfaces/inference_client.py`: интерфейс для inference (если не добавлен ранее).
 - `backend/app/presentation/workers/gpu/pose/triton_client.py`: реализация `InferenceClient`.
 - `backend/app/presentation/workers/gpu/pose/preprocessing.py`: подготовка кадров/тензоров.
 - `backend/app/presentation/workers/gpu/pose/postprocessing.py`: heatmaps -> keypoints, фильтры confidence.
 - `backend/app/presentation/workers/gpu/pose/run.py`:
-  - чтение `normalized.mp4`;
+  - чтение нормализованного видео по `storage_path` из артефакта `ArtifactKind.NORMALIZED`;
   - inference батчами;
-  - запись `keypoints_v1.jsonl`;
-  - вызов `HandleStageCompleted(stage=POSE, artifacts=[...])`.
+  - запись `keypoints_v1.jsonl` в storage;
+  - вызов `HandleStageCompleted(stage=POSE, artifacts=[Artifact(kind=ArtifactKind.KEYPOINTS, version="v1", storage_path=...)])`.
 
 **Зависимости:** фазы 6-7.
 **Готовность:** при успехе очередь получает `FEATURES`.
@@ -344,10 +346,10 @@ todos:
 
 ### Задачи
 - `backend/app/presentation/workers/cpu/features/run.py`:
-  - чтение `keypoints_v1.jsonl`;
+  - чтение `keypoints_v1.jsonl` по `storage_path` из артефакта `ArtifactKind.KEYPOINTS`;
   - вычисление метрик и временных рядов;
-  - запись `features_v1.json`;
-  - вызов `HandleStageCompleted(stage=FEATURES, artifacts=[...])`.
+  - запись `features_v1.json` в storage;
+  - вызов `HandleStageCompleted(stage=FEATURES, artifacts=[Artifact(kind=ArtifactKind.FEATURES, version="v1", storage_path=...)])`.
 - минимальная валидация и тест на sample данных.
 
 **Зависимости:** фаза 8.
@@ -361,10 +363,10 @@ todos:
 
 ### Задачи
 - `backend/app/presentation/workers/cpu/feedback/run.py`:
-  - чтение `features_v1.json`;
+  - чтение `features_v1.json` по `storage_path` из артефакта `ArtifactKind.FEATURES`;
   - загрузка `rules/feedback/v1.yaml`;
-  - генерация `feedback_v1.json`;
-  - вызов `HandleStageCompleted(stage=FEEDBACK, artifacts=[...])`.
+  - генерация `feedback_v1.json` в storage;
+  - вызов `HandleStageCompleted(stage=FEEDBACK, artifacts=[Artifact(kind=ArtifactKind.FEEDBACK, version="v1", storage_path=...)])`.
 - инициировать `FinalizeAnalysis` через use case (если не входит в `HandleStageCompleted`).
 
 **Зависимости:** фаза 9.
