@@ -3,6 +3,8 @@
 import logging
 from uuid import UUID
 
+from backend.app.presentation.workers.cpu.transcode.run import run_transcode
+
 logger = logging.getLogger(__name__)
 
 
@@ -10,24 +12,13 @@ def transcode_task(video_id: str) -> None:
     """
     Transcode task - normalizes video to standard format.
 
-    This task will be implemented in Phase 7.
-    For now, it's a placeholder that logs the execution.
-
     Args:
         video_id: UUID of the video to transcode (as string)
     """
     video_uuid = UUID(video_id)
     logger.info("Transcode task started", extra={"video_id": str(video_uuid)})
-
-    # TODO: Phase 7 - Implement transcode logic
-    # 1. Read original video from storage
-    # 2. Normalize via ffmpeg (resolution, FPS, codec)
-    # 3. Extract metadata (duration, fps, dimensions)
-    # 4. Save normalized.mp4 to storage
-    # 5. Update status in DB
-    # 6. Enqueue pose task
-
-    logger.info("Transcode task completed (placeholder)", extra={"video_id": str(video_uuid)})
+    run_transcode(video_uuid)
+    logger.info("Transcode task completed", extra={"video_id": str(video_uuid)})
 
 
 def pose_task(video_id: str) -> None:

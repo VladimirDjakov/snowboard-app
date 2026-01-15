@@ -10,10 +10,12 @@ from backend.app.application.use_cases.analysis import (
     FailAnalysis,
     FinalizeAnalysis,
     GetAnalysisStatus,
+    HandleStageStarted,
     HandleStageCompleted,
     ListArtifacts,
     StartAnalysis,
 )
+from backend.app.application.use_cases.transcode import RunTranscodeStage
 from backend.app.application.use_cases.video import (
     CompleteUpload,
     CreateVideo,
@@ -31,6 +33,7 @@ from backend.app.infrastructure.db.video_repo import PostgresVideoRepo
 from backend.app.infrastructure.queue.redis_client import RedisClient
 from backend.app.infrastructure.queue.redis_queue import RedisQueue
 from backend.app.infrastructure.storage import create_storage_backend
+from backend.app.infrastructure.video.ffmpeg_transcoder import FfmpegTranscoder
 from backend.app.presentation.bootstrap.settings import Settings
 
 
@@ -59,6 +62,7 @@ class Container:
         self.queue = RedisQueue(redis_conn)
         # Create storage backend (implements Storage protocol via duck typing)
         self.storage = create_storage_backend(settings)
+        self.transcoder = FfmpegTranscoder()
 
     def create_uow(self, session: Session) -> UnitOfWork:
         """
@@ -99,6 +103,14 @@ class Container:
             self.clock,
             uow,
         )
+        handle_stage_started = HandleStageStarted(job_repo, uow)
+        transcode_stage = RunTranscodeStage(
+            self.storage,
+            self.transcoder,
+            handle_stage_started,
+            handle_stage_completed,
+            fail_analysis,
+        )
         get_analysis_status = GetAnalysisStatus(job_repo)
         list_artifacts = ListArtifacts(job_repo)
         create_video = CreateVideo(video_repo, self.storage, uow)
@@ -127,6 +139,8 @@ class Container:
             get_video_artifacts=get_video_artifacts,
             start_analysis=start_analysis,
             handle_stage_completed=handle_stage_completed,
+            handle_stage_started=handle_stage_started,
+            transcode_stage=transcode_stage,
             finalize_analysis=finalize_analysis,
             fail_analysis=fail_analysis,
             get_analysis_status=get_analysis_status,
@@ -197,6 +211,8 @@ class UseCases:
         get_video_artifacts: GetVideoArtifacts,
         start_analysis: StartAnalysis,
         handle_stage_completed: HandleStageCompleted,
+        handle_stage_started: HandleStageStarted,
+        transcode_stage: RunTranscodeStage,
         finalize_analysis: FinalizeAnalysis,
         fail_analysis: FailAnalysis,
         get_analysis_status: GetAnalysisStatus,
@@ -209,6 +225,8 @@ class UseCases:
         self.get_video_artifacts = get_video_artifacts
         self.start_analysis = start_analysis
         self.handle_stage_completed = handle_stage_completed
+        self.handle_stage_started = handle_stage_started
+        self.transcode_stage = transcode_stage
         self.finalize_analysis = finalize_analysis
         self.fail_analysis = fail_analysis
         self.get_analysis_status = get_analysis_status

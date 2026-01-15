@@ -229,6 +229,44 @@ class HandleStageCompleted:
         return None
 
 
+class HandleStageStarted:
+    """Use case for marking a processing stage as running."""
+
+    def __init__(self, job_repo: JobRepo, uow: UnitOfWork) -> None:
+        """
+        Initialize use case.
+
+        Args:
+            job_repo: Job repository
+            uow: Unit of Work for transaction management
+        """
+        self._job_repo = job_repo
+        self._uow = uow
+
+    def execute(self, video_id: UUID, stage: Stage) -> None:
+        """
+        Mark a stage as running.
+
+        Args:
+            video_id: Video identifier
+            stage: Stage that is starting
+
+        Raises:
+            ValueError: If stage transition is invalid
+        """
+        job = self._job_repo.lock_job(video_id)
+        if job is None:
+            raise ValueError(f"Job not found for video {video_id}")
+
+        current_status = job.stages.get(stage)
+        if current_status in (StageStatus.RUNNING, StageStatus.DONE):
+            return
+
+        job.mark_stage_running(stage)
+        self._job_repo.save_job(job)
+        self._uow.commit()
+
+
 class FailAnalysis:
     """Use case for failing analysis."""
 
