@@ -1,1 +1,1 @@
-"""RQ worker entrypoints and tasks."""
+"""RQ worker entrypoints and handlers."""

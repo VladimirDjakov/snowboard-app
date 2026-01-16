@@ -28,5 +28,5 @@ COPY schemas/ ./schemas/
 # Set Python path
 ENV PYTHONPATH=/app
 
-# Run RQ worker for CPU queue
-CMD ["sh", "-c", "rq worker --url ${REDIS_URL:-redis://redis:6379/0} cpu"]
+# Run RQ worker via application entrypoint (CPU queue)
+CMD ["sh", "-c", "python -m backend.app.presentation.workers.rq.worker_entrypoint cpu"]
