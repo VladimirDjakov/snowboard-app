@@ -8,7 +8,8 @@ from uuid import UUID
 class Stage(str, Enum):
     """Processing stages in the analysis pipeline."""
 
-    TRANSCODE = "transcode"
+    # TODO: add method to iterate over stages in order
+    NORMALIZE = "normalize"
     POSE = "pose"
     FEATURES = "features"
     FEEDBACK = "feedback"
@@ -93,7 +94,7 @@ class AnalysisJob:
             raise ValueError(f"Cannot mark stage {stage.value} as DONE from {current_status.value}")
 
         # Check that previous stages are done (invariant: stages complete in order)
-        stage_order = [Stage.TRANSCODE, Stage.POSE, Stage.FEATURES, Stage.FEEDBACK]
+        stage_order = [Stage.NORMALIZE, Stage.POSE, Stage.FEATURES, Stage.FEEDBACK]
         stage_index = stage_order.index(stage)
         for prev_stage in stage_order[:stage_index]:
             if self.stages.get(prev_stage) != StageStatus.DONE:

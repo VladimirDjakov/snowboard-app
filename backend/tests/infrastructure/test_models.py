@@ -133,7 +133,7 @@ class TestVideo:
         # Create a stage
         stage = JobStageDB(
             video_id=sample_video.id,
-            name=Stage.TRANSCODE,
+            name=Stage.NORMALIZE,
             status=StageStatus.PENDING,
         )
         test_session.add(stage)
@@ -150,7 +150,7 @@ class TestVideo:
 
         # Test relationships
         assert len(sample_video.stages) == 1
-        assert sample_video.stages[0].name == Stage.TRANSCODE
+        assert sample_video.stages[0].name == Stage.NORMALIZE
         assert len(sample_video.artifacts) == 1
         assert sample_video.artifacts[0].kind == ArtifactKind.ORIGINAL
 
@@ -162,7 +162,7 @@ class TestJobStage:
         """Test creating a job stage."""
         stage = JobStageDB(
             video_id=sample_video.id,
-            name=Stage.TRANSCODE,
+            name=Stage.NORMALIZE,
             status=StageStatus.PENDING,
         )
         test_session.add(stage)
@@ -170,7 +170,7 @@ class TestJobStage:
 
         assert stage.id is not None
         assert stage.video_id == sample_video.id
-        assert stage.name == Stage.TRANSCODE
+        assert stage.name == Stage.NORMALIZE
         assert stage.status == StageStatus.PENDING
         assert stage.started_at is None
         assert stage.ended_at is None
@@ -182,7 +182,7 @@ class TestJobStage:
         """Test that (video_id, name) must be unique."""
         stage1 = JobStageDB(
             video_id=sample_video.id,
-            name=Stage.TRANSCODE,
+            name=Stage.NORMALIZE,
             status=StageStatus.PENDING,
         )
         test_session.add(stage1)
@@ -191,7 +191,7 @@ class TestJobStage:
         # Try to create duplicate
         stage2 = JobStageDB(
             video_id=sample_video.id,
-            name=Stage.TRANSCODE,  # Same name
+            name=Stage.NORMALIZE,  # Same name
             status=StageStatus.QUEUED,
         )
         test_session.add(stage2)
@@ -267,7 +267,7 @@ class TestJobStage:
 
         stage = JobStageDB(
             video_id=video.id,
-            name=Stage.TRANSCODE,
+            name=Stage.NORMALIZE,
             status=StageStatus.PENDING,
         )
         test_session.add(stage)
@@ -419,7 +419,7 @@ class TestModelRelationships:
         stages = [
             JobStageDB(
                 video_id=video.id,
-                name=Stage.TRANSCODE,
+                name=Stage.NORMALIZE,
                 status=StageStatus.DONE,
             ),
             JobStageDB(
@@ -446,7 +446,7 @@ class TestModelRelationships:
 
         assert len(video.stages) == 4
         assert {stage.name for stage in video.stages} == {
-            Stage.TRANSCODE,
+            Stage.NORMALIZE,
             Stage.POSE,
             Stage.FEATURES,
             Stage.FEEDBACK,
@@ -535,21 +535,21 @@ class TestModelRelationships:
         video.status = VideoStatus.UPLOADED
         test_session.commit()
 
-        # Create transcode stage
-        transcode_stage = JobStageDB(
+        # Create normalize stage
+        normalize_stage = JobStageDB(
             video_id=video.id,
-            name=Stage.TRANSCODE,
+            name=Stage.NORMALIZE,
             status=StageStatus.QUEUED,
         )
-        test_session.add(transcode_stage)
+        test_session.add(normalize_stage)
 
         # Update video status
         video.status = VideoStatus.PROCESSING
         test_session.commit()
 
-        # Simulate transcode completion
-        transcode_stage.status = StageStatus.RUNNING
-        transcode_stage.started_at = datetime.now(UTC)
+        # Simulate normalize completion
+        normalize_stage.status = StageStatus.RUNNING
+        normalize_stage.started_at = datetime.now(UTC)
         test_session.commit()
 
         normalized_artifact = ArtifactDB(
@@ -560,12 +560,12 @@ class TestModelRelationships:
         )
         test_session.add(normalized_artifact)
 
-        transcode_stage.status = StageStatus.DONE
-        transcode_stage.ended_at = datetime.now(UTC)
+        normalize_stage.status = StageStatus.DONE
+        normalize_stage.ended_at = datetime.now(UTC)
         test_session.commit()
 
         # Verify relationships
         assert len(video.stages) == 1
         assert len(video.artifacts) == 2
         assert video.status == VideoStatus.PROCESSING
-        assert transcode_stage.status == StageStatus.DONE
+        assert normalize_stage.status == StageStatus.DONE

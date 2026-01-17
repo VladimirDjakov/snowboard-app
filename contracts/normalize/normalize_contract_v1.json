@@ -1,0 +1,14 @@
+{
+    "version": "v1",
+    "model": {
+      "name": "normalizer",
+      "framework": "ffmpeg",
+      "input_type": "video"
+    },
+    "input": {
+      "max_dim": 640,
+      "fps": 30,
+      "pad_to_max_dim": true
+    }
+  }
+  

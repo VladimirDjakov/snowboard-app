@@ -110,15 +110,15 @@ class StartAnalysis:
             if stage not in job.stages:
                 job.stages[stage] = StageStatus.PENDING
 
-        # Publish TRANSCODE stage to queue
+        # Publish NORMALIZE stage to queue
         self._queue.publish(
-            stage=Stage.TRANSCODE,
+            stage=Stage.NORMALIZE,
             video_id=video_id,
-            idempotency_key=f"{video_id}:{Stage.TRANSCODE.value}",
+            idempotency_key=f"{video_id}:{Stage.NORMALIZE.value}",
         )
 
-        # Mark TRANSCODE as QUEUED
-        job.stages[Stage.TRANSCODE] = StageStatus.QUEUED
+        # Mark NORMALIZE as QUEUED
+        job.stages[Stage.NORMALIZE] = StageStatus.QUEUED
 
         # Update status to RUNNING
         job.status = AnalysisJobStatus.RUNNING
@@ -219,7 +219,7 @@ class HandleStageCompleted:
     @staticmethod
     def _get_next_stage(current_stage: Stage) -> Stage | None:
         """Get next stage in pipeline."""
-        stage_order = [Stage.TRANSCODE, Stage.POSE, Stage.FEATURES, Stage.FEEDBACK]
+        stage_order = [Stage.NORMALIZE, Stage.POSE, Stage.FEATURES, Stage.FEEDBACK]
         try:
             current_index = stage_order.index(current_stage)
             if current_index < len(stage_order) - 1:

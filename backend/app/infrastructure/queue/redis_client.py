@@ -50,7 +50,7 @@ class RedisClient:
                 )
                 self._connection = redis.from_url(
                     self._config.redis_url,
-                    decode_responses=True,
+                    decode_responses=False,
                     socket_connect_timeout=5,
                     socket_timeout=5,
                     retry_on_timeout=True,

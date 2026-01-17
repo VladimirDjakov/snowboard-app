@@ -1,31 +1,48 @@
-.PHONY: dev-up dev-down pull-models migrate test lint loadenv
+.PHONY: dev-up dev-down dev-build dev-up-force dev-rebuild pull-models migrate test lint lint-fix format
 
+# Docker Compose configuration
+DOCKER_COMPOSE = docker compose -f infra/docker-compose.yml
+SERVICES = api worker-cpu
+
+# UV configuration
+UV_RUN = uv run --directory backend
+
+# Environment variables
 POSTGRES_USER ?= snowboard
 POSTGRES_PASSWORD ?= snowboard_password
 POSTGRES_DB ?= snowboard_db
 POSTGRES_PORT ?= 5432
 
 dev-up:
-	@docker compose -f infra/docker-compose.yml up -d
+	@$(DOCKER_COMPOSE) up -d
 
 dev-down:
-	@docker compose -f infra/docker-compose.yml down
+	@$(DOCKER_COMPOSE) down
+
+dev-build:
+	@$(DOCKER_COMPOSE) build --no-cache $(SERVICES)
+
+dev-up-force:
+	@$(DOCKER_COMPOSE) up -d --force-recreate $(SERVICES)
+
+dev-rebuild: dev-down dev-build dev-up-force
 
 pull-models:
 	@bash infra/scripts/pull_models.sh
 
 migrate:
 	@bash -c "DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/${POSTGRES_DB} \
-	uv run --directory backend alembic upgrade head"
+	$(UV_RUN) alembic upgrade head"
+
 lint:
-	@uv run --directory backend ruff check .
+	@$(UV_RUN) ruff check .
 
 lint-fix:
-	@uv run --directory backend ruff check --fix .
+	@$(UV_RUN) ruff check --fix .
 
 format:
-	@uv run --directory backend ruff format .
+	@$(UV_RUN) ruff format .
 
 test:
 	@echo "Run tests here"
-	@uv run --directory backend pytest tests/
+	@$(UV_RUN) pytest tests/

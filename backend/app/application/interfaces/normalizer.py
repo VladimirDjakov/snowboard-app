@@ -1,4 +1,4 @@
-"""Interface for video transcoding and probing."""
+"""Interface for video normalization and probing."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ class VideoMetadata:
     nb_frames: float | None
 
 
-class VideoTranscoder(Protocol):
-    """Protocol for video transcoding and probing."""
+class VideoNormalizer(Protocol):
+    """Protocol for video normalization and probing."""
 
     def normalize(
         self,
@@ -27,8 +27,8 @@ class VideoTranscoder(Protocol):
         output_path: Path,
         *,
         fps: int,
-        width: int | None = None,
-        height: int | None = None,
+        max_dim: int | None = None,
+        pad_to_max_dim: bool = False,
     ) -> None:
         """Normalize video to a standard format."""
         ...

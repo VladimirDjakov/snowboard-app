@@ -129,7 +129,7 @@ class CompleteUploadRequest(BaseModel):
 class StageInfo(BaseModel):
     """Status information for a processing stage."""
 
-    name: str = Field(..., description="Stage name (transcode, pose, features, feedback)")
+    name: str = Field(..., description="Stage name (normalize, pose, features, feedback)")
     status: str = Field(..., description="Stage status (pending, queued, running, done, failed)")
     started_at: datetime | None = Field(None, description="When stage started")
     ended_at: datetime | None = Field(None, description="When stage completed")
@@ -137,7 +137,7 @@ class StageInfo(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "name": "transcode",
+                "name": "normalize",
                 "status": "queued",
                 "started_at": None,
                 "ended_at": None,
@@ -238,7 +238,7 @@ class CompleteUploadResponse(BaseModel):
                 "job_id": "c1c4b8f0-3aa2-4cb7-9fd8-2ef4c6e8f9a1",
                 "pipeline_version": "mvp_v1",
                 "stages": [
-                    {"name": "transcode", "status": "queued"},
+                    {"name": "normalize", "status": "queued"},
                     {"name": "pose", "status": "pending"},
                     {"name": "features", "status": "pending"},
                     {"name": "feedback", "status": "pending"},
@@ -273,7 +273,7 @@ class VideoStatusResponse(BaseModel):
                     "updated_at": "2026-01-07T10:58:12Z",
                 },
                 "stages": [
-                    {"name": "transcode", "status": "done", "started_at": "...", "ended_at": "..."},
+                    {"name": "normalize", "status": "done", "started_at": "...", "ended_at": "..."},
                     {"name": "pose", "status": "running", "started_at": "...", "ended_at": None},
                     {"name": "features", "status": "pending", "started_at": None, "ended_at": None},
                     {"name": "feedback", "status": "pending", "started_at": None, "ended_at": None},

@@ -78,7 +78,7 @@ class TestRedisClientConnection:
 
             mock_from_url.assert_called_once_with(
                 test_url,
-                decode_responses=True,
+                decode_responses=False,
                 socket_connect_timeout=5,
                 socket_timeout=5,
                 retry_on_timeout=True,

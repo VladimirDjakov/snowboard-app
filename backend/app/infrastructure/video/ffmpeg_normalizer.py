@@ -1,4 +1,4 @@
-"""FFmpeg-based implementation of VideoTranscoder."""
+"""FFmpeg-based implementation of VideoNormalizer."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.app.application.interfaces.transcoder import VideoMetadata, VideoTranscoder
+from backend.app.application.interfaces.normalizer import VideoMetadata, VideoNormalizer
 
 
 def _run_command(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -62,8 +62,8 @@ def _extract_video_metadata(ffprobe_json: dict[str, Any]) -> VideoMetadata:
 
 
 @dataclass(frozen=True, slots=True)
-class FfmpegTranscoder(VideoTranscoder):
-    """FFmpeg-backed transcoder implementation."""
+class FfmpegNormalizer(VideoNormalizer):
+    """FFmpeg-backed normalizer implementation."""
 
     video_codec: str = "libx264"
     preset: str = "fast"
@@ -76,14 +76,15 @@ class FfmpegTranscoder(VideoTranscoder):
         output_path: Path,
         *,
         fps: int,
-        width: int | None = None,
-        height: int | None = None,
+        max_dim: int | None = None,
+        pad_to_max_dim: bool = False,
     ) -> None:
-        filters: list[str] = []
-        if fps:
-            filters.append(f"fps={fps}")
-        if width is not None and height is not None:
-            filters.append(f"scale={width}:{height}")
+        filters = [f"fps={fps}"]
+        if max_dim is not None:
+            scale_filter = f"scale='if(gt(iw,ih),{max_dim},-2)':'if(gt(iw,ih),-2,{max_dim})'"
+            if pad_to_max_dim:
+                scale_filter += f",pad={max_dim}:{max_dim}:(ow-iw)/2:(oh-ih)/2"
+            filters.append(scale_filter)
 
         args = ["ffmpeg", "-y", "-i", str(input_path)]
         if filters:
