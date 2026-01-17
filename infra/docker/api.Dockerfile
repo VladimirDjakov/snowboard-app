@@ -19,6 +19,7 @@ RUN uv pip install --system -e .
 
 # Copy backend code
 COPY backend/ ./backend/
+COPY contracts/ ./contracts/
 
 # Set Python path
 ENV PYTHONPATH=/app

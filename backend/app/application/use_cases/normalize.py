@@ -1,4 +1,4 @@
-"""Use case for running transcode stage."""
+"""Use case for running normalize stage."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import UUID
 
+from backend.app.application.interfaces.normalizer import VideoMetadata, VideoNormalizer
 from backend.app.application.interfaces.storage import Storage
-from backend.app.application.interfaces.transcoder import VideoMetadata, VideoTranscoder
 from backend.app.application.use_cases.analysis import (
     FailAnalysis,
     HandleStageCompleted,
@@ -17,51 +17,57 @@ from backend.app.application.use_cases.analysis import (
 from backend.app.domain.analysis_job import Stage
 from backend.app.domain.value_objects import Artifact, ArtifactKind
 
-TARGET_FPS = 30
 NORMALIZED_VERSION = "v1"
 
 
 @dataclass(frozen=True, slots=True)
-class TranscodeOutcome:
-    """Result of a successful transcode stage."""
+class NormalizeResult:
+    """Result of a successful normalize stage."""
 
     artifact: Artifact
     metadata: VideoMetadata
 
 
-class RunTranscodeStage:
-    """Use case that performs transcode and advances pipeline."""
+class RunNormalizeStage:
+    """Use case that performs normalization and advances pipeline."""
 
     def __init__(
         self,
         storage: Storage,
-        transcoder: VideoTranscoder,
+        normalizer: VideoNormalizer,
         handle_stage_started: HandleStageStarted,
         handle_stage_completed: HandleStageCompleted,
         fail_analysis: FailAnalysis,
+        *,
+        target_fps: int,
+        target_max_dim: int | None = None,
+        pad_to_max_dim: bool = False,
     ) -> None:
         """
         Initialize use case.
 
         Args:
             storage: Storage adapter
-            transcoder: Video transcoder adapter
+            normalizer: Video normalizer adapter
             handle_stage_started: Use case for starting stage
             handle_stage_completed: Use case for completing stage
             fail_analysis: Use case for failing stage
         """
         self._storage = storage
-        self._transcoder = transcoder
+        self._normalizer = normalizer
         self._handle_stage_started = handle_stage_started
         self._handle_stage_completed = handle_stage_completed
         self._fail_analysis = fail_analysis
+        self._target_fps = target_fps
+        self._target_max_dim = target_max_dim
+        self._pad_to_max_dim = pad_to_max_dim
 
-    def execute(self, video_id: UUID) -> TranscodeOutcome | None:
+    def execute(self, video_id: UUID) -> NormalizeResult | None:
         """
-        Run transcode stage for a video.
+        Run normalize stage for a video.
 
         Returns:
-            TranscodeOutcome when work is performed, None when already completed.
+            NormalizeOutcome when work is performed, None when already completed.
         """
         normalized_artifact = Artifact(
             kind=ArtifactKind.NORMALIZED,
@@ -70,12 +76,11 @@ class RunTranscodeStage:
         )
         original_storage_path = f"raw/{video_id}/original.mp4"
         normalized_storage_path = normalized_artifact.storage_path
+        self._handle_stage_started.execute(video_id, Stage.NORMALIZE)
 
         if self._storage.exists(normalized_storage_path):
-            self._handle_stage_completed.execute(video_id, Stage.TRANSCODE, [normalized_artifact])
+            self._handle_stage_completed.execute(video_id, Stage.NORMALIZE, [normalized_artifact])
             return None
-
-        self._handle_stage_started.execute(video_id, Stage.TRANSCODE)
 
         try:
             with TemporaryDirectory() as tmp_dir:
@@ -88,8 +93,14 @@ class RunTranscodeStage:
                 output_path, needs_upload = _prepare_output_path(
                     self._storage, normalized_storage_path, base_dir=base_dir
                 )
-                self._transcoder.normalize(input_path, output_path, fps=TARGET_FPS)
-                metadata = self._transcoder.probe(output_path)
+                self._normalizer.normalize(
+                    input_path,
+                    output_path,
+                    fps=self._target_fps,
+                    max_dim=self._target_max_dim,
+                    pad_to_max_dim=self._pad_to_max_dim,
+                )
+                metadata = self._normalizer.probe(output_path)
 
                 if needs_upload:
                     _upload_to_storage(
@@ -101,12 +112,12 @@ class RunTranscodeStage:
 
             self._handle_stage_completed.execute(
                 video_id,
-                Stage.TRANSCODE,
+                Stage.NORMALIZE,
                 [normalized_artifact],
             )
-            return TranscodeOutcome(artifact=normalized_artifact, metadata=metadata)
+            return NormalizeResult(artifact=normalized_artifact, metadata=metadata)
         except Exception as exc:
-            self._fail_analysis.execute(video_id, Stage.TRANSCODE, str(exc))
+            self._fail_analysis.execute(video_id, Stage.NORMALIZE, str(exc))
             raise
 
 
@@ -119,7 +130,7 @@ def _materialize_from_storage(storage: Storage, storage_path: str, *, base_dir: 
     if local_path is not None and local_path.exists():
         return local_path
 
-    target_path = base_dir / storage_path
+    target_path = base_dir.joinpath(storage_path)
     _ensure_parent_dir(target_path)
     target_path.write_bytes(storage.read_file(storage_path))
     return target_path
@@ -130,7 +141,7 @@ def _prepare_output_path(
 ) -> tuple[Path, bool]:
     local_path = storage.get_file_path(storage_path)
     if local_path is None:
-        return base_dir / "normalized.mp4", True
+        return base_dir.joinpath("normalized.mp4"), True
     _ensure_parent_dir(local_path)
     return local_path, False
 

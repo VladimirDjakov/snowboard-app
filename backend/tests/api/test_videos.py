@@ -188,7 +188,7 @@ class TestCompleteUpload:
             job_id=video_id,
             pipeline_version="mvp_v1",
             stages=[
-                StageView(name="transcode", status="queued"),
+                StageView(name="normalize", status="queued"),
                 StageView(name="pose", status="pending"),
                 StageView(name="features", status="pending"),
                 StageView(name="feedback", status="pending"),
@@ -208,7 +208,7 @@ class TestCompleteUpload:
         assert data["video_id"] == str(video_id)
         assert data["status"] == "created"
         assert data["pipeline_version"] == "mvp_v1"
-        assert len(data["stages"]) == 4  # TRANSCODE, POSE, FEATURES, FEEDBACK
+        assert len(data["stages"]) == 4  # NORMALIZE, POSE, FEATURES, FEEDBACK
 
         mock_use_cases.complete_upload.execute.assert_called_once()
 
@@ -269,7 +269,7 @@ class TestGetVideoStatus:
             current_stage="pose",
             updated_at=datetime.now(UTC),
             stages=[
-                StageView(name="transcode", status="done"),
+                StageView(name="normalize", status="done"),
                 StageView(name="pose", status="running"),
                 StageView(name="features", status="pending"),
                 StageView(name="feedback", status="pending"),
@@ -308,10 +308,10 @@ class TestGetVideoStatus:
             status="created",
             pipeline_version="mvp_v1",
             progress_pct=0.0,
-            current_stage="transcode",
+            current_stage="normalize",
             updated_at=datetime.now(UTC),
             stages=[
-                StageView(name="transcode", status="pending"),
+                StageView(name="normalize", status="pending"),
                 StageView(name="pose", status="pending"),
                 StageView(name="features", status="pending"),
                 StageView(name="feedback", status="pending"),

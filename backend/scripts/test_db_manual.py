@@ -89,7 +89,7 @@ def main():
         stages = [
             JobStageDB(
                 video_id=video.id,
-                name=Stage.TRANSCODE,
+                name=Stage.NORMALIZE,
                 status=StageStatus.PENDING,
             ),
             JobStageDB(
@@ -173,25 +173,25 @@ def main():
         print(f"✓ Видео: {video.status.value}")
 
         # Обновляем стадию
-        transcode_stage = (
+        normalize_stage = (
             db.query(JobStageDB)
-            .filter(JobStageDB.video_id == video.id, JobStageDB.name == Stage.TRANSCODE)
+            .filter(JobStageDB.video_id == video.id, JobStageDB.name == Stage.NORMALIZE)
             .first()
         )
 
-        if transcode_stage:
-            transcode_stage.status = StageStatus.RUNNING
-            transcode_stage.started_at = datetime.now(UTC)
+        if normalize_stage:
+            normalize_stage.status = StageStatus.RUNNING
+            normalize_stage.started_at = datetime.now(UTC)
             db.commit()
-            print(f"✓ Стадия {transcode_stage.name.value}: {transcode_stage.status.value}")
-            print(f"  Начало: {transcode_stage.started_at}")
+            print(f"✓ Стадия {normalize_stage.name.value}: {normalize_stage.status.value}")
+            print(f"  Начало: {normalize_stage.started_at}")
 
-            transcode_stage.status = StageStatus.DONE
-            transcode_stage.ended_at = datetime.now(UTC)
+            normalize_stage.status = StageStatus.DONE
+            normalize_stage.ended_at = datetime.now(UTC)
             video.status = VideoStatus.PROCESSING
             db.commit()
-            print(f"✓ Стадия {transcode_stage.name.value}: {transcode_stage.status.value}")
-            print(f"  Завершено: {transcode_stage.ended_at}")
+            print(f"✓ Стадия {normalize_stage.name.value}: {normalize_stage.status.value}")
+            print(f"  Завершено: {normalize_stage.ended_at}")
             print(f"✓ Видео: {video.status.value}")
 
         print_separator()

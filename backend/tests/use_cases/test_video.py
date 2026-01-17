@@ -162,7 +162,7 @@ class TestCompleteUpload:
         mock_video_repo.get.return_value = video_meta
 
         job = AnalysisJob(video_id=video_id, status=AnalysisJobStatus.RUNNING)
-        job.stages[Stage.TRANSCODE] = StageStatus.QUEUED
+        job.stages[Stage.NORMALIZE] = StageStatus.QUEUED
         job.stages[Stage.POSE] = StageStatus.PENDING
         job.stages[Stage.FEATURES] = StageStatus.PENDING
         job.stages[Stage.FEEDBACK] = StageStatus.PENDING
@@ -274,7 +274,7 @@ class TestGetVideoStatus:
         mock_video_repo.get.return_value = video_meta
 
         job = AnalysisJob(video_id=video_id, status=AnalysisJobStatus.RUNNING)
-        job.stages[Stage.TRANSCODE] = StageStatus.DONE
+        job.stages[Stage.NORMALIZE] = StageStatus.DONE
         job.stages[Stage.POSE] = StageStatus.RUNNING
         job.stages[Stage.FEATURES] = StageStatus.PENDING
         job.stages[Stage.FEEDBACK] = StageStatus.PENDING
@@ -346,7 +346,7 @@ class TestGetVideoStatus:
         assert result.video_id == video_id
         assert result.status == VideoStatus.CREATED.value
         assert result.progress_pct == 0.0
-        assert result.current_stage == Stage.TRANSCODE.value
+        assert result.current_stage == Stage.NORMALIZE.value
         assert len(result.stages) == 4
         assert all(s.status == StageStatus.PENDING.value for s in result.stages)
         assert len(result.artifacts) == 0
@@ -371,7 +371,7 @@ class TestGetVideoStatus:
 
         job = AnalysisJob(video_id=video_id, status=AnalysisJobStatus.FAILED)
         job.error_message = "Processing failed"
-        job.stages[Stage.TRANSCODE] = StageStatus.FAILED
+        job.stages[Stage.NORMALIZE] = StageStatus.FAILED
         mock_get_status.execute.return_value = job
         mock_list_artifacts.execute.return_value = []
 
@@ -444,7 +444,7 @@ class TestGetVideoStatus:
         mock_video_repo.get.return_value = video_meta
 
         job = AnalysisJob(video_id=video_id, status=AnalysisJobStatus.RUNNING)
-        job.stages[Stage.TRANSCODE] = StageStatus.DONE
+        job.stages[Stage.NORMALIZE] = StageStatus.DONE
         job.stages[Stage.POSE] = StageStatus.DONE
         job.stages[Stage.FEATURES] = StageStatus.DONE
         job.stages[Stage.FEEDBACK] = StageStatus.RUNNING

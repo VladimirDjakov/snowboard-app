@@ -1,16 +1,13 @@
 """Model contract loaders for workers."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-POSE_CONTRACT_PATH = REPO_ROOT / "contracts" / "pose" / "pose_contract_v1.json"
-SKELETON_MAPPING_PATH = REPO_ROOT / "contracts" / "pose" / "skeleton_mapping_v1.yaml"
+_CONTRACTS_ROOT = Path(__file__).resolve().parents[5] / "contracts"
+NORMALIZE_CONTRACT_PATH = _CONTRACTS_ROOT / "normalize" / "normalize_contract_v1.json"
+POSE_CONTRACT_PATH = _CONTRACTS_ROOT / "pose" / "pose_contract_v1.json"
+SKELETON_MAPPING_PATH = _CONTRACTS_ROOT / "pose" / "skeleton_mapping_v1.yaml"
 
 
 def _read_text(path: Path) -> str:
@@ -19,7 +16,7 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def load_pose_contract(path: Path = POSE_CONTRACT_PATH) -> dict[str, Any]:
+def load_contract(path: Path = NORMALIZE_CONTRACT_PATH) -> dict[str, Any]:
     """
     Load pose model contract (JSON).
 
@@ -37,6 +34,12 @@ def load_skeleton_mapping(path: Path = SKELETON_MAPPING_PATH) -> dict[str, Any]:
 
     Returns empty dict if the mapping file is empty.
     """
+    try:
+        import yaml
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "PyYAML is required to load the skeleton mapping. Install it to use pose features."
+        ) from exc
     data = _read_text(path)
     if not data:
         return {}

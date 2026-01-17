@@ -14,8 +14,8 @@ from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 class TestRedisQueue:
     """Tests for RedisQueue class."""
 
-    def test_publish_enqueues_transcode_on_cpu_queue(self):
-        """Publish transcode stage enqueues to CPU queue."""
+    def test_publish_enqueues_normalize_on_cpu_queue(self):
+        """Publish normalize stage enqueues to CPU queue."""
         with patch("backend.app.infrastructure.queue.redis_queue.Queue") as mock_queue_class:
             mock_conn = MagicMock()
             mock_queue = MagicMock(spec=Queue)
@@ -27,12 +27,12 @@ class TestRedisQueue:
             queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
-            job_id = queue.publish(Stage.TRANSCODE, video_id)
+            job_id = queue.publish(Stage.NORMALIZE, video_id)
 
             assert job_id == "job-1"
             mock_queue_class.assert_called_once_with(name=QueueName.CPU.value, connection=mock_conn)
             mock_queue.enqueue.assert_called_once_with(
-                "backend.app.presentation.workers.rq.handlers.transcode_task",
+                "backend.app.presentation.workers.rq.handlers.normalize_task",
                 str(video_id),
             )
 
@@ -70,7 +70,7 @@ class TestRedisQueue:
             queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
-            queue.publish(Stage.TRANSCODE, video_id)
+            queue.publish(Stage.NORMALIZE, video_id)
             queue.publish(Stage.FEATURES, video_id)
 
             mock_queue_class.assert_called_once_with(name=QueueName.CPU.value, connection=mock_conn)
@@ -89,7 +89,7 @@ class TestRedisQueue:
             queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
-            queue.publish(Stage.TRANSCODE, video_id)
+            queue.publish(Stage.NORMALIZE, video_id)
             queue.publish(Stage.POSE, video_id)
 
             assert mock_queue_class.call_count == 2
