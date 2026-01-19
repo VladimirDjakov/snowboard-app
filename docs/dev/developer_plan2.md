@@ -20,8 +20,8 @@ todos:
   - id: phase6-workers-common
     content: "Фаза 6: Workers Common (адаптеры + утилиты)"
     status: pending
-  - id: phase7-transcode
-    content: "Фаза 7: Transcode Worker (CPU)"
+  - id: phase7-normalize
+    content: "Фаза 7: Normalize Worker (CPU)"
     status: pending
   - id: phase8-pose
     content: "Фаза 8: Pose Worker (GPU) + Triton adapter"
@@ -55,7 +55,7 @@ todos:
 
 1. **Снизу вверх**: инфраструктура и базовые зависимости перед бизнес-логикой.
 2. **По зависимостям**: модули, от которых зависят другие — раньше.
-3. **По пайплайну**: transcode → pose → features → feedback.
+3. **По пайплайну**: normalize → pose → features → feedback.
 4. **Clean-lite границы**:
    - `domain/` и `application/` не импортируют FastAPI/SQLAlchemy/redis/boto3/tritonclient.
    - всё общение с внешним миром через **Interfaces**.
@@ -184,7 +184,7 @@ todos:
 
 - `domain/analysis_job.py`
   - `AnalysisJobStatus` (enum)
-  - `Stage` (enum: TRANSCODE/POSE/FEATURES/FEEDBACK)
+  - `Stage` (enum: NORMALIZE/POSE/FEATURES/FEEDBACK)
   - `AnalysisJob` (state machine, инварианты)
 - `domain/value_objects.py`
   - `ArtifactKind` (enum: ORIGINAL, NORMALIZED, KEYPOINTS, FEATURES, FEEDBACK)
@@ -302,16 +302,16 @@ todos:
 
 ---
 
-## Фаза 7: Transcode Worker (CPU)
+## Фаза 7: Normalize Worker (CPU)
 
 **Цель:** нормализовать видео и инициировать следующий этап пайплайна.
 
 ### Задачи
-- `backend/app/presentation/workers/cpu/transcode/run.py`:
+- `backend/app/presentation/workers/cpu/normalize/run.py`:
   - скачать оригинальное видео из storage по `storage_path`;
   - выполнить нормализацию (ffmpeg);
   - сохранить `normalized_video` в storage (используя `ArtifactKind.NORMALIZED`);
-  - вызвать `HandleStageCompleted` со стадией `TRANSCODE` и артефактом (с `storage_path`).
+  - вызвать `HandleStageCompleted` со стадией `NORMALIZE` и артефактом (с `storage_path`).
 - обработка ошибок через `FailAnalysis`.
 - unit/smoke тест обработки малого видео.
 
@@ -410,8 +410,8 @@ todos:
 ```mermaid
 graph TD
     API[Фазы 1-5: База + API] --> Common[Фаза 6: Workers Common]
-    Common --> Transcode[Фаза 7: Transcode]
-    Transcode --> Pose[Фаза 8: Pose]
+    Common --> Normalize[Фаза 7: Normalize]
+    Normalize --> Pose[Фаза 8: Pose]
     Pose --> Features[Фаза 9: Features]
     Features --> Feedback[Фаза 10: Feedback]
     Feedback --> Reliability[Фаза 11: Надежность]

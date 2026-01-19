@@ -11,7 +11,7 @@ flowchart LR
     U["User<br>Browser"] --> FE["React Frontend"]
     FE --> API["FastAPI Backend"]
     API --> DB[("Postgres")] & S3[("Object Storage<br>MinIO / S3<br>Local FS for MVP")] & RQ["Redis Queue"]
-    RQ --> CPU["CPU Workers<br>Transcode / Features / Feedback"] & GPU["GPU Workers<br>Pose Client"]
+    RQ --> CPU["CPU Workers<br>Normalize / Features / Feedback"] & GPU["GPU Workers<br>Pose Client"]
     CPU --> S3 & DB & RQ
     GPU --> TRT["Triton Inference Server<br>TensorRT Models"] & S3 & DB & RQ
 ```
