@@ -17,6 +17,7 @@ from backend.app.application.use_cases.analysis import (
     StartAnalysis,
 )
 from backend.app.application.use_cases.normalize import RunNormalizeStage
+from backend.app.application.use_cases.pose import RunPoseStage
 from backend.app.application.use_cases.video import (
     CompleteUpload,
     CreateVideo,
@@ -31,9 +32,14 @@ from backend.app.infrastructure.db.session import (
 )
 from backend.app.infrastructure.db.uow import PostgresUnitOfWork
 from backend.app.infrastructure.db.video_repo import PostgresVideoRepo
+from backend.app.infrastructure.pose.ultralytics_pose_estimator import (
+    UltralyticsPoseConfig,
+    UltralyticsPoseEstimator,
+)
 from backend.app.infrastructure.queue.redis_client import RedisClient
 from backend.app.infrastructure.queue.redis_queue import RedisQueue
 from backend.app.infrastructure.storage import create_storage_backend
+from backend.app.infrastructure.storage.storage_io import DefaultStorageIO
 from backend.app.infrastructure.video.ffmpeg_normalizer import FfmpegNormalizer
 from backend.app.presentation.bootstrap.settings import Settings
 from backend.app.presentation.workers.common.contracts import load_contract
@@ -66,6 +72,7 @@ class Container:
         self._queue = RedisQueue(redis_conn, TASK_MAP)
         # Create storage backend (implements Storage protocol via duck typing)
         self.storage = create_storage_backend(settings)
+        self.storage_io = DefaultStorageIO(self.storage)
         self.normalizer = FfmpegNormalizer()
         self._normalize_targets = self._resolve_normalize_targets()
 
@@ -128,8 +135,18 @@ class Container:
             uow,
         )
         handle_stage_started = HandleStageStarted(job_repo, uow)
+        pose_estimator = UltralyticsPoseEstimator(
+            UltralyticsPoseConfig(
+                model_path=self.settings.pose_model_path,
+                device=self.settings.pose_device,
+                imgsz=self.settings.pose_imgsz,
+                conf=self.settings.pose_conf,
+                iou=self.settings.pose_iou,
+            )
+        )
         normalize_stage = RunNormalizeStage(
             self.storage,
+            self.storage_io,
             self.normalizer,
             handle_stage_started,
             handle_stage_completed,
@@ -137,6 +154,15 @@ class Container:
             target_fps=self._normalize_targets["fps"],
             target_max_dim=self._normalize_targets["max_dim"],
             pad_to_max_dim=self._normalize_targets["pad_to_max_dim"],
+        )
+        pose_stage = RunPoseStage(
+            self.storage,
+            self.storage_io,
+            job_repo,
+            pose_estimator,
+            handle_stage_started,
+            handle_stage_completed,
+            fail_analysis,
         )
         get_analysis_status = GetAnalysisStatus(job_repo)
         list_artifacts = ListArtifacts(job_repo)
@@ -168,6 +194,7 @@ class Container:
             handle_stage_completed=handle_stage_completed,
             handle_stage_started=handle_stage_started,
             normalize_stage=normalize_stage,
+            pose_stage=pose_stage,
             finalize_analysis=finalize_analysis,
             fail_analysis=fail_analysis,
             get_analysis_status=get_analysis_status,
@@ -244,6 +271,7 @@ class UseCases:
         handle_stage_completed: HandleStageCompleted,
         handle_stage_started: HandleStageStarted,
         normalize_stage: RunNormalizeStage,
+        pose_stage: RunPoseStage,
         finalize_analysis: FinalizeAnalysis,
         fail_analysis: FailAnalysis,
         get_analysis_status: GetAnalysisStatus,
@@ -258,6 +286,7 @@ class UseCases:
         self.handle_stage_completed = handle_stage_completed
         self.handle_stage_started = handle_stage_started
         self.normalize_stage = normalize_stage
+        self.pose_stage = pose_stage
         self.finalize_analysis = finalize_analysis
         self.fail_analysis = fail_analysis
         self.get_analysis_status = get_analysis_status

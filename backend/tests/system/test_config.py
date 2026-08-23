@@ -54,6 +54,28 @@ def test_config_defaults():
     assert settings.triton_url == "http://localhost:8001"
     assert settings.s3_region == "ru-msk-1"
     assert settings.s3_presigned_url_expiry == 3600
+    assert settings.pose_model_path == "yolov8n-pose.pt"
+    assert settings.pose_device == "cpu"
+    assert settings.pose_imgsz == 640
+    assert settings.pose_conf == 0.25
+    assert settings.pose_iou == 0.7
+
+
+def test_config_accepts_pose_settings():
+    """Test typed pose worker configuration."""
+    settings = Settings(
+        pose_model_path="models/snowboard-pose.pt",
+        pose_device="cuda",
+        pose_imgsz=960,
+        pose_conf=0.4,
+        pose_iou=0.6,
+    )
+
+    assert settings.pose_model_path == "models/snowboard-pose.pt"
+    assert settings.pose_device == "cuda"
+    assert settings.pose_imgsz == 960
+    assert settings.pose_conf == 0.4
+    assert settings.pose_iou == 0.6
 
 
 def test_config_s3_validation():

@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from backend.app.infrastructure.storage.base import BaseStorage
-
 
 @dataclass
 class VideoMetadata:
@@ -137,37 +135,3 @@ def normalize_video(
 
     run_ffmpeg(args)
     return output_path
-
-
-def materialize_from_storage(
-    storage: BaseStorage,
-    storage_path: str,
-    *,
-    base_dir: Path,
-) -> Path:
-    """
-    Ensure a storage object is available as a local file.
-
-    For local storage, returns the existing file path.
-    For remote storage, downloads the object into base_dir.
-    """
-    local_path = storage.get_file_path(storage_path)
-    if local_path is not None and local_path.exists():
-        return local_path
-
-    target_path = base_dir / storage_path
-    ensure_parent_dir(target_path)
-    target_path.write_bytes(storage.read_file(storage_path))
-    return target_path
-
-
-def upload_to_storage(
-    storage: BaseStorage,
-    storage_path: str,
-    file_path: Path | str,
-    *,
-    content_type: str | None = None,
-) -> None:
-    """Upload a local file to storage."""
-    file_path = Path(file_path)
-    storage.write_file(storage_path, file_path.read_bytes(), content_type=content_type)
