@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from redis import Redis
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
@@ -10,8 +11,8 @@ from backend.app.application.use_cases.analysis import (
     FailAnalysis,
     FinalizeAnalysis,
     GetAnalysisStatus,
-    HandleStageStarted,
     HandleStageCompleted,
+    HandleStageStarted,
     ListArtifacts,
     StartAnalysis,
 )
@@ -35,10 +36,14 @@ from backend.app.infrastructure.queue.redis_queue import RedisQueue
 from backend.app.infrastructure.storage import create_storage_backend
 from backend.app.infrastructure.video.ffmpeg_transcoder import FfmpegTranscoder
 from backend.app.presentation.bootstrap.settings import Settings
+from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 
 
 class Container:
     """Dependency injection container."""
+
+    # TODO: create dependencies for api and workers in separate methods
+    # TODO: implement lazy connections for db and queue
 
     def __init__(self, settings: Settings) -> None:
         """
@@ -48,7 +53,6 @@ class Container:
             settings: Application settings
         """
         self._settings = settings
-
         # Create database engine and session factory
         self._engine: Engine = create_engine_from_settings(settings)
         self._session_factory: Callable[[], Session] = create_session_factory(self._engine)
@@ -56,10 +60,9 @@ class Container:
         # Create Redis client
         self._redis_client = RedisClient(settings)
         redis_conn = self._redis_client.get_connection()
-
         # Initialize shared adapters (stateless)
         self.clock = SystemClock()
-        self.queue = RedisQueue(redis_conn)
+        self._queue: RedisQueue(redis_conn, TASK_MAP)
         # Create storage backend (implements Storage protocol via duck typing)
         self.storage = create_storage_backend(settings)
         self.transcoder = FfmpegTranscoder()
@@ -96,10 +99,10 @@ class Container:
         # Create use cases
         finalize_analysis = FinalizeAnalysis(job_repo, self.clock)
         fail_analysis = FailAnalysis(job_repo, self.clock, uow)
-        start_analysis = StartAnalysis(job_repo, self.queue, self.clock, uow)
+        start_analysis = StartAnalysis(job_repo, self._queue, self.clock, uow)
         handle_stage_completed = HandleStageCompleted(
             job_repo,
-            self.queue,
+            self._queue,
             self.clock,
             uow,
         )
@@ -147,7 +150,7 @@ class Container:
             list_artifacts=list_artifacts,
         )
 
-    def get_session(self) -> Session:
+    def get_db_session(self) -> Session:
         """
         Get a new database session.
 
@@ -178,6 +181,10 @@ class Container:
             True if Redis is healthy, False otherwise
         """
         return self._redis_client.check_health()
+
+    def get_redis_connection(self) -> Redis:
+        """Get Redis connection for infrastructure workers."""
+        return self._redis_client.get_connection()
 
     def check_storage_health(self) -> bool:
         """

@@ -1,38 +1,31 @@
 """Tests for Redis client."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from redis.exceptions import ConnectionError, RedisError
 
-from backend.app.infrastructure.queue import redis_client as redis_module
-from backend.app.presentation.bootstrap.settings import Settings
+from backend.app.infrastructure.queue.redis_client import RedisClient
 
 
-class TestGetRedisConnection:
-    """Tests for get_redis_connection function."""
+def make_config(redis_url: str = "redis://localhost:6379/0") -> SimpleNamespace:
+    """Create a minimal config object for RedisClient."""
+    return SimpleNamespace(redis_url=redis_url)
+
+
+class TestRedisClientConnection:
+    """Tests for RedisClient.get_connection."""
 
     def test_creates_connection_on_first_call(self):
         """Test that connection is created on first call."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
 
-            conn = redis_module.get_redis_connection()
+            client = RedisClient(make_config())
+            conn = client.get_connection()
 
             assert conn is not None
             mock_from_url.assert_called_once()
@@ -40,99 +33,48 @@ class TestGetRedisConnection:
 
     def test_returns_cached_connection_on_subsequent_calls(self):
         """Test that subsequent calls return cached connection."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
 
-            # First call
-            conn1 = redis_module.get_redis_connection()
-            # Second call
-            conn2 = redis_module.get_redis_connection()
+            client = RedisClient(make_config())
+            conn1 = client.get_connection()
+            conn2 = client.get_connection()
 
             assert conn1 is conn2
-            # from_url should be called only once
             assert mock_from_url.call_count == 1
 
     def test_raises_connection_error_on_failed_connection(self):
         """Test that ConnectionError is raised on failed connection."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_from_url.side_effect = ConnectionError("Connection failed")
 
+            client = RedisClient(make_config())
             with pytest.raises(ConnectionError, match="Connection failed"):
-                redis_module.get_redis_connection()
+                client.get_connection()
 
     def test_raises_redis_error_on_ping_failure(self):
         """Test that RedisError is raised when ping fails."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_conn = MagicMock()
             mock_conn.ping.side_effect = RedisError("Ping failed")
             mock_from_url.return_value = mock_conn
 
+            client = RedisClient(make_config())
             with pytest.raises(RedisError, match="Ping failed"):
-                redis_module.get_redis_connection()
+                client.get_connection()
 
-    def test_uses_correct_redis_url_from_settings(self):
-        """Test that correct Redis URL is used from settings."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
+    def test_uses_correct_redis_url_from_config(self):
+        """Test that correct Redis URL is used from config."""
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             test_url = "redis://test-host:6380/1"
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url=test_url,
-            )
-            mock_load_settings.return_value = mock_settings
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
 
-            redis_module.get_redis_connection()
+            client = RedisClient(make_config(redis_url=test_url))
+            client.get_connection()
 
             mock_from_url.assert_called_once_with(
                 test_url,
@@ -143,101 +85,40 @@ class TestGetRedisConnection:
             )
 
 
-class TestCheckRedisHealth:
-    """Tests for check_redis_health function."""
+class TestRedisClientHealth:
+    """Tests for RedisClient.check_health."""
 
     def test_returns_true_when_redis_is_healthy(self):
         """Test that health check returns True when Redis is healthy."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_conn = MagicMock()
             mock_conn.ping.return_value = True
             mock_from_url.return_value = mock_conn
 
-            result = redis_module.check_redis_health()
+            client = RedisClient(make_config())
+            result = client.check_health()
 
             assert result is True
-            # ping() is called twice: once in get_connection() and once in check_health()
             assert mock_conn.ping.call_count >= 1
 
     def test_returns_false_on_connection_error(self):
         """Test that health check returns False on ConnectionError."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_from_url.side_effect = ConnectionError("Connection failed")
 
-            result = redis_module.check_redis_health()
+            client = RedisClient(make_config())
+            result = client.check_health()
 
             assert result is False
 
     def test_returns_false_on_redis_error(self):
         """Test that health check returns False on RedisError."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
+        with patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url:
             mock_conn = MagicMock()
             mock_conn.ping.side_effect = RedisError("Ping failed")
             mock_from_url.return_value = mock_conn
 
-            result = redis_module.check_redis_health()
-
-            assert result is False
-
-    def test_returns_false_on_ping_failure(self):
-        """Test that health check returns False when ping fails."""
-        # Reset singleton
-        redis_module._redis_client = None
-
-        with (
-            patch("backend.app.infrastructure.queue.redis_client.redis.from_url") as mock_from_url,
-            patch(
-                "backend.app.presentation.bootstrap.settings.load_settings"
-            ) as mock_load_settings,
-        ):
-            mock_settings = Settings(
-                database_url="postgresql://user:pass@localhost/db",
-                redis_url="redis://localhost:6379/0",
-            )
-            mock_load_settings.return_value = mock_settings
-            mock_conn = MagicMock()
-            mock_conn.ping.side_effect = RedisError("Ping failed")
-            mock_from_url.return_value = mock_conn
-
-            result = redis_module.check_redis_health()
+            client = RedisClient(make_config())
+            result = client.check_health()
 
             assert result is False

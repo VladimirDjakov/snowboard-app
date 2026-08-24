@@ -8,6 +8,7 @@ from rq.job import Job
 
 from backend.app.domain.analysis_job import Stage
 from backend.app.infrastructure.queue.redis_queue import QueueName, RedisQueue
+from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 
 
 class TestRedisQueue:
@@ -23,7 +24,7 @@ class TestRedisQueue:
             mock_queue.enqueue.return_value = mock_job
             mock_queue_class.return_value = mock_queue
 
-            queue = RedisQueue(mock_conn)
+            queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
             job_id = queue.publish(Stage.TRANSCODE, video_id)
@@ -31,7 +32,8 @@ class TestRedisQueue:
             assert job_id == "job-1"
             mock_queue_class.assert_called_once_with(name=QueueName.CPU.value, connection=mock_conn)
             mock_queue.enqueue.assert_called_once_with(
-                "backend.app.presentation.workers.rq.tasks.transcode_task", str(video_id)
+                "backend.app.presentation.workers.rq.handlers.transcode_task",
+                str(video_id),
             )
 
     def test_publish_enqueues_pose_on_gpu_queue(self):
@@ -44,7 +46,7 @@ class TestRedisQueue:
             mock_queue.enqueue.return_value = mock_job
             mock_queue_class.return_value = mock_queue
 
-            queue = RedisQueue(mock_conn)
+            queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
             job_id = queue.publish(Stage.POSE, video_id)
@@ -52,7 +54,7 @@ class TestRedisQueue:
             assert job_id == "job-2"
             mock_queue_class.assert_called_once_with(name=QueueName.GPU.value, connection=mock_conn)
             mock_queue.enqueue.assert_called_once_with(
-                "backend.app.presentation.workers.rq.tasks.pose_task", str(video_id)
+                "backend.app.presentation.workers.rq.handlers.pose_task", str(video_id)
             )
 
     def test_publish_reuses_queue_instance_for_same_queue(self):
@@ -65,7 +67,7 @@ class TestRedisQueue:
             mock_queue.enqueue.return_value = mock_job
             mock_queue_class.return_value = mock_queue
 
-            queue = RedisQueue(mock_conn)
+            queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
             queue.publish(Stage.TRANSCODE, video_id)
@@ -84,7 +86,7 @@ class TestRedisQueue:
             mock_queue.enqueue.return_value = mock_job
             mock_queue_class.return_value = mock_queue
 
-            queue = RedisQueue(mock_conn)
+            queue = RedisQueue(mock_conn, TASK_MAP)
             video_id = uuid4()
 
             queue.publish(Stage.TRANSCODE, video_id)
