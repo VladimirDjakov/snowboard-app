@@ -29,7 +29,7 @@ def _parse_fraction(value: Any) -> float | None:
         num, den = value.split("/", 1)
         try:
             return float(num) / float(den)
-        except ValueError:
+        except (ValueError, ZeroDivisionError):
             return None
     try:
         return float(value)

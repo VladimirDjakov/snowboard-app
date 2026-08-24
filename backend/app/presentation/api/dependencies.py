@@ -21,7 +21,7 @@ def get_use_cases(request: Request) -> Generator[UseCases, None, None]:
     """Build request-scoped use cases and manage DB session lifecycle."""
 
     container = get_container(request)
-    session: Session = container.get_session()
+    session: Session = container.get_db_session()
     try:
         yield container.build_use_cases(session)
     finally:

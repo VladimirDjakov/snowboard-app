@@ -2,28 +2,18 @@
 
 import argparse
 import logging
-import os
 import signal
 import sys
-from typing import NoReturn, Protocol
 
 import redis
 from rq import Queue, Worker
 
-# Configure logging before importing other modules
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+from backend.app.infrastructure.logging import setup_logging
+from backend.app.infrastructure.queue.redis_queue import QueueName
+from backend.app.presentation.bootstrap.container import Container
+from backend.app.presentation.bootstrap.settings import Settings, load_settings
 
 logger = logging.getLogger(__name__)
-
-
-class RedisConfig(Protocol):
-    """Protocol for Redis configuration."""
-
-    redis_url: str
 
 
 class WorkerConfig:
@@ -32,7 +22,6 @@ class WorkerConfig:
     def __init__(
         self,
         queue_name: str,
-        redis_url: str | None = None,
         verbose: bool = False,
     ) -> None:
         """
@@ -40,84 +29,48 @@ class WorkerConfig:
 
         Args:
             queue_name: Name of the queue to process
-            redis_url: Redis connection URL (default: from REDIS_URL env var)
             verbose: Enable verbose logging
         """
-        if queue_name not in ("cpu", "gpu"):
-            raise ValueError(f"Invalid queue name: {queue_name}. Must be 'cpu' or 'gpu'")
+        allowed = {queue.value for queue in QueueName}
+        if queue_name not in allowed:
+            raise ValueError(
+                f"Invalid queue name: {queue_name}. Must be one of: {', '.join(sorted(allowed))}"
+            )
 
         self.queue_name = queue_name
-        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.verbose = verbose
 
 
 class WorkerManager:
     """Manager for RQ worker lifecycle."""
 
-    def __init__(self, config: WorkerConfig) -> None:
+    def __init__(self, config: WorkerConfig, settings: Settings) -> None:
         """
         Initialize worker manager.
 
         Args:
             config: Worker configuration
+            settings: Application settings
         """
         self._config = config
         self._logger = logging.getLogger(__name__)
         self._worker: Worker | None = None
-        self._redis_conn: redis.Redis[str] | None = None
+        self._redis_conn: redis.Redis | None = None
+        self._container = Container(settings)
 
     def setup_logging(self) -> None:
         """Configure logging for the worker."""
         level = logging.DEBUG if self._config.verbose else logging.INFO
-        logging.getLogger().setLevel(level)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
+        for handler in root_logger.handlers:
+            handler.setLevel(level)
         logging.getLogger("rq.worker").setLevel(level)
 
-    def create_redis_connection(self) -> redis.Redis[str]:
-        """
-        Create Redis connection.
-
-        Returns:
-            Redis connection instance
-
-        Raises:
-            SystemExit: If connection fails
-        """
-        self._logger.info(
-            "Connecting to Redis",
-            extra={"redis_url": self._config.redis_url, "queue": self._config.queue_name},
-        )
-
-        try:
-            conn = redis.from_url(
-                self._config.redis_url,
-                decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-                retry_on_timeout=True,
-            )
-
-            # Test connection
-            conn.ping()
-            self._logger.info("Redis connection established")
-            self._redis_conn = conn
-            return conn
-
-        except (redis.ConnectionError, redis.RedisError) as e:
-            self._logger.error(
-                "Failed to connect to Redis",
-                extra={"error": str(e), "redis_url": self._config.redis_url},
-            )
-            sys.exit(1)
-
-    def create_worker(self) -> Worker:
-        """
-        Create RQ worker instance.
-
-        Returns:
-            RQ Worker instance
-        """
+    def create_worker(self) -> None:
+        """Create RQ worker instance."""
         if self._redis_conn is None:
-            self.create_redis_connection()
+            self._redis_conn = self._container.get_redis_connection()
 
         queue = Queue(name=self._config.queue_name, connection=self._redis_conn)
         worker = Worker(
@@ -128,7 +81,6 @@ class WorkerManager:
             "Worker created", extra={"queue": self._config.queue_name, "worker_name": worker.name}
         )
         self._worker = worker
-        return worker
 
     def setup_signal_handlers(self) -> None:
         """Setup signal handlers for graceful shutdown."""
@@ -168,11 +120,7 @@ class WorkerManager:
 
     def cleanup(self) -> None:
         """Cleanup resources."""
-        if self._redis_conn is not None:
-            try:
-                self._redis_conn.close()
-            except Exception as e:
-                self._logger.warning("Error closing Redis connection", extra={"error": str(e)})
+        self._container.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -185,7 +133,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="RQ worker for video processing tasks")
     parser.add_argument(
         "queue",
-        choices=["cpu", "gpu"],
+        choices=[queue.value for queue in QueueName],
         help="Queue name to process tasks from",
     )
     parser.add_argument(
@@ -204,18 +152,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> NoReturn:
+def main() -> None:
     """Main entrypoint for RQ worker."""
     args = parse_args()
+    manager: WorkerManager | None = None
 
     try:
+        settings = load_settings()
+        if args.redis_url:
+            settings = settings.model_copy(update={"redis_url": args.redis_url})
+        setup_logging(settings)
         config = WorkerConfig(
             queue_name=args.queue,
-            redis_url=args.redis_url,
             verbose=args.verbose,
         )
 
-        manager = WorkerManager(config)
+        manager = WorkerManager(config, settings)
         manager.setup_logging()
         manager.create_worker()
         manager.setup_signal_handlers()
@@ -230,6 +182,8 @@ def main() -> NoReturn:
         logger.error("Worker error", extra={"error": str(e)}, exc_info=True)
         sys.exit(1)
     finally:
+        if manager is not None:
+            manager.cleanup()
         logger.info("Worker stopped")
 
     sys.exit(0)

@@ -1,19 +1,24 @@
 """PostgreSQL database session configuration."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-if TYPE_CHECKING:
-    from backend.app.presentation.bootstrap.settings import Settings
+
+class DatabaseSettings(Protocol):
+    """Protocol for database configuration."""
+
+    database_url: str
+    database_echo: bool
+
 
 # Create declarative base for models
 Base = declarative_base()
 
 
-def create_engine_from_settings(settings: "Settings") -> Engine:
+def create_engine_from_settings(settings: DatabaseSettings) -> Engine:
     """
     Create SQLAlchemy engine from settings.
 

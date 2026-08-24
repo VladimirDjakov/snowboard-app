@@ -1,15 +1,28 @@
 """Storage adapters."""
 
-from typing import TYPE_CHECKING
+from typing import Protocol
 
-if TYPE_CHECKING:
-    from backend.app.presentation.bootstrap.settings import Settings
 from backend.app.infrastructure.storage.base import BaseStorage
 from backend.app.infrastructure.storage.local import LocalStorage
 from backend.app.infrastructure.storage.s3 import S3Storage
 
 
-def create_storage_backend(settings: "Settings") -> BaseStorage:
+class StorageSettings(Protocol):
+    """Protocol for storage configuration."""
+
+    storage_backend: str
+    storage_local_path: str
+    api_host: str
+    api_port: int
+    s3_endpoint_url: str | None
+    s3_access_key_id: str | None
+    s3_secret_access_key: str | None
+    s3_bucket_name: str | None
+    s3_region: str
+    s3_presigned_url_expiry: int
+
+
+def create_storage_backend(settings: StorageSettings) -> BaseStorage:
     """
     Create storage backend instance based on settings.
 

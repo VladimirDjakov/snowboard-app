@@ -18,6 +18,14 @@ class QueueName(str, Enum):
     GPU = "gpu"
 
 
+STAGE_TO_QUEUE: dict[Stage, QueueName] = {
+    Stage.TRANSCODE: QueueName.CPU,
+    Stage.POSE: QueueName.GPU,
+    Stage.FEATURES: QueueName.CPU,
+    Stage.FEEDBACK: QueueName.CPU,
+}
+
+
 class RedisConnection(Protocol):
     """Protocol for Redis connection."""
 
@@ -29,14 +37,16 @@ class RedisConnection(Protocol):
 class RedisQueue:
     """Redis implementation of Queue port."""
 
-    def __init__(self, redis_conn: RedisConnection) -> None:
+    def __init__(self, redis_conn: RedisConnection, task_map: dict[Stage, str]) -> None:
         """
         Initialize queue adapter.
 
         Args:
             redis_conn: Redis connection instance
+            task_map: Mapping of Stage to task function path
         """
         self._redis_conn = redis_conn
+        self._task_map = task_map
         self._logger = logging.getLogger(__name__)
         self._queues: dict[QueueName, Queue] = {}
 
@@ -82,10 +92,10 @@ class RedisQueue:
     ) -> str:
         """Publish a task to the queue."""
         # Map Stage to QueueName
-        queue_name = self._map_stage_to_queue(stage)
+        queue_name = STAGE_TO_QUEUE[stage]
 
         # Map Stage to task function path
-        task_func = self._map_stage_to_task(stage)
+        task_func = self._task_map[stage]
 
         # Generate idempotency key if not provided
         if idempotency_key is None:
@@ -99,23 +109,3 @@ class RedisQueue:
         )
 
         return job.id
-
-    @staticmethod
-    def _map_stage_to_queue(stage: Stage) -> QueueName:
-        """Map domain Stage to QueueName."""
-        # CPU queue: TRANSCODE, FEATURES, FEEDBACK
-        # GPU queue: POSE
-        if stage == Stage.POSE:
-            return QueueName.GPU
-        return QueueName.CPU
-
-    @staticmethod
-    def _map_stage_to_task(stage: Stage) -> str:
-        """Map domain Stage to task function path."""
-        mapping = {
-            Stage.TRANSCODE: "backend.app.presentation.workers.rq.tasks.transcode_task",
-            Stage.POSE: "backend.app.presentation.workers.rq.tasks.pose_task",
-            Stage.FEATURES: "backend.app.presentation.workers.rq.tasks.features_task",
-            Stage.FEEDBACK: "backend.app.presentation.workers.rq.tasks.feedback_task",
-        }
-        return mapping[stage]

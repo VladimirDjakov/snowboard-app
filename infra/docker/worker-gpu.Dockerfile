@@ -37,5 +37,5 @@ COPY schemas/ ./schemas/
 # Set Python path
 ENV PYTHONPATH=/app
 
-# Run RQ worker for GPU queue
-CMD ["sh", "-c", "rq worker --url ${REDIS_URL:-redis://redis:6379/0} gpu"]
+# Run RQ worker via application entrypoint (GPU queue)
+CMD ["sh", "-c", "python -m backend.app.presentation.workers.rq.worker_entrypoint gpu"]

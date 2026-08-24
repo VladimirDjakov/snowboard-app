@@ -13,16 +13,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 
+from types import SimpleNamespace
+
 from backend.app.domain.analysis_job import Stage
-from backend.app.infrastructure.queue.redis_client import check_redis_health, get_redis_connection
+from backend.app.infrastructure.queue.redis_client import RedisClient
 from backend.app.infrastructure.queue.redis_queue import RedisQueue
+from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 
 
 def test_redis_connection() -> bool:
     """Test Redis connection."""
     print("Testing Redis connection...")
     try:
-        conn = get_redis_connection()
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        conn = client.get_connection()
         result = conn.ping()
         print(f"✓ Redis ping successful: {result}")
         return True
@@ -35,7 +39,8 @@ def test_redis_health() -> bool:
     """Test Redis health check."""
     print("\nTesting Redis health check...")
     try:
-        is_healthy = check_redis_health()
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        is_healthy = client.check_health()
         if is_healthy:
             print("✓ Redis health check passed")
         else:
@@ -50,7 +55,8 @@ def test_enqueue_task() -> bool:
     """Test task enqueueing."""
     print("\nTesting task enqueueing...")
     try:
-        queue = RedisQueue(get_redis_connection())
+        client = RedisClient(SimpleNamespace(redis_url=os.environ["REDIS_URL"]))
+        queue = RedisQueue(client.get_connection(), TASK_MAP)
 
         # Test enqueue to CPU queue
         test_video_id = uuid4()

@@ -2,12 +2,17 @@
 
 import logging
 import sys
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from pythonjsonlogger import json
 
-if TYPE_CHECKING:
-    from backend.app.presentation.bootstrap.settings import Settings
+
+class LoggingSettings(Protocol):
+    """Protocol for logging configuration."""
+
+    log_level: str
+    log_format: str
+    environment: str
 
 
 class BackendContextFilter(logging.Filter):
@@ -29,7 +34,7 @@ class BackendContextFilter(logging.Filter):
         return True
 
 
-def setup_logging(config: "Settings") -> None:
+def setup_logging(config: LoggingSettings) -> None:
     """Configure structured logging for the application.
 
     Args:

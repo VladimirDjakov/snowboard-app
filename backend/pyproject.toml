@@ -17,6 +17,9 @@ dependencies = [
     "rq>=2.6.1",
 ]
 
+[project.scripts]
+snowboard-worker = "backend.app.presentation.workers.rq.worker_entrypoint:main"
+
 [project.optional-dependencies]
 # Worker-specific dependencies are intentionally isolated here.
 workers-cpu = [
