@@ -60,8 +60,8 @@ def test_enqueue_task() -> bool:
 
         # Test enqueue to CPU queue
         test_video_id = uuid4()
-        print(f"Enqueueing transcode task for video_id: {test_video_id}")
-        job_id = queue.publish(Stage.TRANSCODE, test_video_id)
+        print(f"Enqueueing normalize task for video_id: {test_video_id}")
+        job_id = queue.publish(Stage.NORMALIZE, test_video_id)
         print(f"✓ Task enqueued to CPU queue. Job ID: {job_id}")
 
         # Test enqueue to GPU queue

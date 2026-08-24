@@ -16,7 +16,7 @@ from backend.app.application.use_cases.analysis import (
     ListArtifacts,
     StartAnalysis,
 )
-from backend.app.application.use_cases.transcode import RunTranscodeStage
+from backend.app.application.use_cases.normalize import RunNormalizeStage
 from backend.app.application.use_cases.video import (
     CompleteUpload,
     CreateVideo,
@@ -34,8 +34,9 @@ from backend.app.infrastructure.db.video_repo import PostgresVideoRepo
 from backend.app.infrastructure.queue.redis_client import RedisClient
 from backend.app.infrastructure.queue.redis_queue import RedisQueue
 from backend.app.infrastructure.storage import create_storage_backend
-from backend.app.infrastructure.video.ffmpeg_transcoder import FfmpegTranscoder
+from backend.app.infrastructure.video.ffmpeg_normalizer import FfmpegNormalizer
 from backend.app.presentation.bootstrap.settings import Settings
+from backend.app.presentation.workers.common.contracts import load_contract
 from backend.app.presentation.workers.rq.task_registry import TASK_MAP
 
 
@@ -62,10 +63,30 @@ class Container:
         redis_conn = self._redis_client.get_connection()
         # Initialize shared adapters (stateless)
         self.clock = SystemClock()
-        self._queue: RedisQueue(redis_conn, TASK_MAP)
+        self._queue = RedisQueue(redis_conn, TASK_MAP)
         # Create storage backend (implements Storage protocol via duck typing)
         self.storage = create_storage_backend(settings)
-        self.transcoder = FfmpegTranscoder()
+        self.normalizer = FfmpegNormalizer()
+        self._normalize_targets = self._resolve_normalize_targets()
+
+    def _resolve_normalize_targets(self) -> dict[str, int]:
+        contract = load_contract()
+        input_spec = contract.get("input", {}) if isinstance(contract, dict) else {}
+        fps = input_spec.get("fps")
+        max_dim = input_spec.get("max_dim")
+        pad_to_max_dim = input_spec.get("pad_to_max_dim")
+
+        target_fps = fps or 30
+        target_max_dim = max_dim
+        target_pad_to_max_dim = pad_to_max_dim
+
+        return {
+            "fps": int(target_fps) if target_fps is not None else 30,
+            "max_dim": int(target_max_dim) if target_max_dim is not None else None,
+            "pad_to_max_dim": bool(target_pad_to_max_dim)
+            if target_pad_to_max_dim is not None
+            else False,
+        }
 
     def create_uow(self, session: Session) -> UnitOfWork:
         """
@@ -107,12 +128,15 @@ class Container:
             uow,
         )
         handle_stage_started = HandleStageStarted(job_repo, uow)
-        transcode_stage = RunTranscodeStage(
+        normalize_stage = RunNormalizeStage(
             self.storage,
-            self.transcoder,
+            self.normalizer,
             handle_stage_started,
             handle_stage_completed,
             fail_analysis,
+            target_fps=self._normalize_targets["fps"],
+            target_max_dim=self._normalize_targets["max_dim"],
+            pad_to_max_dim=self._normalize_targets["pad_to_max_dim"],
         )
         get_analysis_status = GetAnalysisStatus(job_repo)
         list_artifacts = ListArtifacts(job_repo)
@@ -143,7 +167,7 @@ class Container:
             start_analysis=start_analysis,
             handle_stage_completed=handle_stage_completed,
             handle_stage_started=handle_stage_started,
-            transcode_stage=transcode_stage,
+            normalize_stage=normalize_stage,
             finalize_analysis=finalize_analysis,
             fail_analysis=fail_analysis,
             get_analysis_status=get_analysis_status,
@@ -219,7 +243,7 @@ class UseCases:
         start_analysis: StartAnalysis,
         handle_stage_completed: HandleStageCompleted,
         handle_stage_started: HandleStageStarted,
-        transcode_stage: RunTranscodeStage,
+        normalize_stage: RunNormalizeStage,
         finalize_analysis: FinalizeAnalysis,
         fail_analysis: FailAnalysis,
         get_analysis_status: GetAnalysisStatus,
@@ -233,7 +257,7 @@ class UseCases:
         self.start_analysis = start_analysis
         self.handle_stage_completed = handle_stage_completed
         self.handle_stage_started = handle_stage_started
-        self.transcode_stage = transcode_stage
+        self.normalize_stage = normalize_stage
         self.finalize_analysis = finalize_analysis
         self.fail_analysis = fail_analysis
         self.get_analysis_status = get_analysis_status

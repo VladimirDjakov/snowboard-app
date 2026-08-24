@@ -20,8 +20,8 @@ todos:
   - id: phase6-workers-common
     content: "Фаза 6: Реализовать общие утилиты для воркеров"
     status: pending
-  - id: phase7-transcode
-    content: "Фаза 7: Реализовать Transcode Worker"
+  - id: phase7-normalize
+    content: "Фаза 7: Реализовать Normalize Worker"
     status: pending
   - id: phase8-pose
     content: "Фаза 8: Реализовать Pose Inference Worker (GPU)"
@@ -46,7 +46,7 @@ todos:
 
 1. **Снизу вверх**: Сначала инфраструктура и базовые модули, затем бизнес-логика
 2. **По зависимостям**: Модули, от которых зависят другие, разрабатываются первыми
-3. **По пайплайну**: Воркеры разрабатываются в порядке обработки (transcode → pose → features → feedback)
+3. **По пайплайну**: Воркеры разрабатываются в порядке обработки (normalize → pose → features → feedback)
 4. **Итеративно**: Каждый этап можно протестировать независимо
 
 ## Фаза 1: Инфраструктура и базовая настройка
@@ -202,11 +202,11 @@ todos:
 
 **Тестирование:** Unit-тесты утилит
 
-## Фаза 7: Workers - Transcode (CPU)
+## Фаза 7: Workers - Normalize (CPU)
 
-### 7.1 Transcode Worker
+### 7.1 Normalize Worker
 
-- Реализовать `backend/app/presentation/workers/cpu/transcode/run.py`:
+- Реализовать `backend/app/presentation/workers/cpu/normalize/run.py`:
   - Чтение оригинального видео из storage
   - Нормализация через ffmpeg (разрешение, FPS, кодек)
   - Извлечение метаданных (длительность, fps, размеры)
@@ -376,14 +376,14 @@ graph TD
     Queue --> WorkersCommon
     DB --> WorkersCommon
     
-    WorkersCommon --> Transcode[Фаза 7: Transcode]
-    Transcode --> Pose[Фаза 8: Pose]
+    WorkersCommon --> Normalize[Фаза 7: Normalize]
+    Normalize --> Pose[Фаза 8: Pose]
     Pose --> Features[Фаза 9: Features]
     Features --> Feedback[Фаза 10: Feedback]
     
     API --> Frontend[Фаза 11: Frontend]
     
-    Transcode --> Integration[Фаза 12: Интеграция]
+    Normalize --> Integration[Фаза 12: Интеграция]
     Pose --> Integration
     Features --> Integration
     Feedback --> Integration
@@ -403,7 +403,7 @@ graph TD
 Для быстрого MVP критический путь:
 
 1. Фазы 1-5 (инфраструктура + API) - 2-3 недели
-2. Фаза 7 (Transcode) - 3-5 дней
+2. Фаза 7 (Normalize) - 3-5 дней
 3. Фаза 8 (Pose) - 1-2 недели (самый сложный)
 4. Фаза 9 (Features) - 3-5 дней
 5. Фаза 10 (Feedback) - 2-3 дня

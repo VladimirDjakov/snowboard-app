@@ -1,4 +1,4 @@
-"""GPU worker orchestration for processing stages."""
+"""Pose worker for GPU-bound stage."""
 
 import logging
 from uuid import UUID
@@ -10,15 +10,12 @@ from backend.app.presentation.workers.common.base_worker import BaseWorker
 logger = logging.getLogger(__name__)
 
 
-class GPUWorker(BaseWorker):
-    """Run GPU-bound stages with shared wiring and lifecycle."""
+class PoseWorker(BaseWorker):
+    """Run the pose stage on GPU."""
 
     @property
-    def _logger(self):
+    def _logger(self) -> logging.Logger:
         return logger
 
     def _execute_stage(self, stage: Stage, video_id: UUID, use_cases: UseCases) -> None:
-        if stage != Stage.POSE:
-            raise ValueError(f"Unsupported stage: {stage}")
-
         logger.info("Pose task completed (placeholder)", extra={"video_id": str(video_id)})

@@ -4,8 +4,8 @@ import argparse
 import logging
 import signal
 import sys
+from uuid import uuid4
 
-import redis
 from rq import Queue, Worker
 
 from backend.app.infrastructure.logging import setup_logging
@@ -55,7 +55,6 @@ class WorkerManager:
         self._config = config
         self._logger = logging.getLogger(__name__)
         self._worker: Worker | None = None
-        self._redis_conn: redis.Redis | None = None
         self._container = Container(settings)
 
     def setup_logging(self) -> None:
@@ -69,13 +68,11 @@ class WorkerManager:
 
     def create_worker(self) -> None:
         """Create RQ worker instance."""
-        if self._redis_conn is None:
-            self._redis_conn = self._container.get_redis_connection()
+        _redis_conn = self._container.get_redis_connection()
 
-        queue = Queue(name=self._config.queue_name, connection=self._redis_conn)
-        worker = Worker(
-            [queue], connection=self._redis_conn, name=f"worker-{self._config.queue_name}"
-        )
+        queue = Queue(name=self._config.queue_name, connection=_redis_conn)
+        worker_name = f"worker-{self._config.queue_name}-{uuid4().hex[:8]}"
+        worker = Worker([queue], connection=_redis_conn, name=worker_name)
 
         self._logger.info(
             "Worker created", extra={"queue": self._config.queue_name, "worker_name": worker.name}

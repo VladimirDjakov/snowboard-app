@@ -71,7 +71,7 @@
   "job_id": "c1c4b8f0-3aa2-4cb7-9fd8-2ef4c6e8f9a1",
   "pipeline_version": "mvp_v1",
   "stages": [
-    {"name": "transcode", "status": "queued"},
+    {"name": "normalize", "status": "queued"},
     {"name": "pose", "status": "pending"},
     {"name": "features", "status": "pending"},
     {"name": "feedback", "status": "pending"}
@@ -108,7 +108,7 @@ GET /v1/videos/a2b6c4c8-2c28-4b3c-8e3e-1c0f1e0a3a2c?share_token=st_4f3f2b1a8b...
     "updated_at": "2026-01-07T10:58:12Z"
   },
   "stages": [
-    {"name": "transcode", "status": "done", "started_at": "...", "ended_at": "..."},
+    {"name": "normalize", "status": "done", "started_at": "...", "ended_at": "..."},
     {"name": "pose", "status": "running", "started_at": "...", "ended_at": null},
     {"name": "features", "status": "pending", "started_at": null, "ended_at": null},
     {"name": "feedback", "status": "pending", "started_at": null, "ended_at": null}
@@ -172,7 +172,7 @@ GET /v1/videos/a2b6c4c8-2c28-4b3c-8e3e-1c0f1e0a3a2c?share_token=st_4f3f2b1a8b...
 
 | Стадия      | Вес |
 |-------------|-----|
-| transcode   | 0.10|
+| normalize   | 0.10|
 | pose        | 0.70|
 | features    | 0.10|
 | feedback    | 0.10|

@@ -82,11 +82,11 @@ class TestHandleStageCompleted:
             video_id=video_id,
             status=AnalysisJobStatus.RUNNING,
         )
-        job.stages[Stage.TRANSCODE] = StageStatus.DONE
+        job.stages[Stage.NORMALIZE] = StageStatus.DONE
         mock_job_repo.lock_job.return_value = job
 
         use_case = HandleStageCompleted(mock_job_repo, mock_queue, mock_clock, mock_uow)
-        use_case.execute(video_id, Stage.TRANSCODE, [])
+        use_case.execute(video_id, Stage.NORMALIZE, [])
 
         # Should not call commit (early return)
         mock_uow.commit.assert_not_called()
@@ -104,11 +104,11 @@ class TestHandleStageCompleted:
             video_id=video_id,
             status=AnalysisJobStatus.RUNNING,
         )
-        job.stages[Stage.TRANSCODE] = StageStatus.RUNNING
+        job.stages[Stage.NORMALIZE] = StageStatus.RUNNING
         mock_job_repo.lock_job.return_value = job
 
         use_case = HandleStageCompleted(mock_job_repo, mock_queue, mock_clock, mock_uow)
-        use_case.execute(video_id, Stage.TRANSCODE, [])
+        use_case.execute(video_id, Stage.NORMALIZE, [])
 
         # Should queue POSE stage
         mock_queue.publish.assert_called_once_with(
@@ -130,7 +130,7 @@ class TestHandleStageCompleted:
             video_id=video_id,
             status=AnalysisJobStatus.RUNNING,
         )
-        job.stages[Stage.TRANSCODE] = StageStatus.DONE
+        job.stages[Stage.NORMALIZE] = StageStatus.DONE
         job.stages[Stage.POSE] = StageStatus.DONE
         job.stages[Stage.FEATURES] = StageStatus.DONE
         job.stages[Stage.FEEDBACK] = StageStatus.RUNNING
@@ -178,7 +178,7 @@ class TestFinalizeAnalysis:
             video_id=video_id,
             status=AnalysisJobStatus.RUNNING,
         )
-        job.stages[Stage.TRANSCODE] = StageStatus.DONE
+        job.stages[Stage.NORMALIZE] = StageStatus.DONE
         job.stages[Stage.POSE] = StageStatus.RUNNING  # Not done
 
         use_case = FinalizeAnalysis(mock_job_repo, mock_clock)
@@ -201,13 +201,13 @@ class TestFailAnalysis:
             video_id=video_id,
             status=AnalysisJobStatus.RUNNING,
         )
-        job.stages[Stage.TRANSCODE] = StageStatus.RUNNING
+        job.stages[Stage.NORMALIZE] = StageStatus.RUNNING
         mock_job_repo.lock_job.return_value = job
 
         use_case = FailAnalysis(mock_job_repo, mock_clock, mock_uow)
-        use_case.execute(video_id, Stage.TRANSCODE, "Test error")
+        use_case.execute(video_id, Stage.NORMALIZE, "Test error")
 
-        assert job.stages[Stage.TRANSCODE] == StageStatus.FAILED
+        assert job.stages[Stage.NORMALIZE] == StageStatus.FAILED
         assert job.status == AnalysisJobStatus.FAILED
         assert job.error_message == "Test error"
         mock_job_repo.save_job.assert_called_once_with(job)

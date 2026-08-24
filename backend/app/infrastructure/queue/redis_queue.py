@@ -19,7 +19,7 @@ class QueueName(str, Enum):
 
 
 STAGE_TO_QUEUE: dict[Stage, QueueName] = {
-    Stage.TRANSCODE: QueueName.CPU,
+    Stage.NORMALIZE: QueueName.CPU,
     Stage.POSE: QueueName.GPU,
     Stage.FEATURES: QueueName.CPU,
     Stage.FEEDBACK: QueueName.CPU,
