@@ -5,6 +5,7 @@ from typing import Protocol
 from backend.app.infrastructure.storage.base import BaseStorage
 from backend.app.infrastructure.storage.local import LocalStorage
 from backend.app.infrastructure.storage.s3 import S3Storage
+from backend.app.infrastructure.storage.storage_io import DefaultStorageIO
 
 
 class StorageSettings(Protocol):
@@ -54,4 +55,10 @@ def create_storage_backend(settings: StorageSettings) -> BaseStorage:
     raise ValueError(f"Unsupported storage_backend: {settings.storage_backend}")
 
 
-__all__ = ["create_storage_backend", "BaseStorage", "LocalStorage", "S3Storage"]
+__all__ = [
+    "create_storage_backend",
+    "BaseStorage",
+    "LocalStorage",
+    "S3Storage",
+    "DefaultStorageIO",
+]

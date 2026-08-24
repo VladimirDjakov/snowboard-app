@@ -1,0 +1,1 @@
+"""Pose inference infrastructure adapters."""

@@ -9,6 +9,7 @@ from uuid import UUID
 
 from backend.app.application.interfaces.normalizer import VideoMetadata, VideoNormalizer
 from backend.app.application.interfaces.storage import Storage
+from backend.app.application.interfaces.storage_io import StorageIO
 from backend.app.application.use_cases.analysis import (
     FailAnalysis,
     HandleStageCompleted,
@@ -34,6 +35,7 @@ class RunNormalizeStage:
     def __init__(
         self,
         storage: Storage,
+        storage_io: StorageIO,
         normalizer: VideoNormalizer,
         handle_stage_started: HandleStageStarted,
         handle_stage_completed: HandleStageCompleted,
@@ -54,6 +56,7 @@ class RunNormalizeStage:
             fail_analysis: Use case for failing stage
         """
         self._storage = storage
+        self._storage_io = storage_io
         self._normalizer = normalizer
         self._handle_stage_started = handle_stage_started
         self._handle_stage_completed = handle_stage_completed
@@ -85,13 +88,14 @@ class RunNormalizeStage:
         try:
             with TemporaryDirectory() as tmp_dir:
                 base_dir = Path(tmp_dir)
-                input_path = _materialize_from_storage(
-                    self._storage,
+                input_path = self._storage_io.materialize_from_storage(
                     original_storage_path,
                     base_dir=base_dir,
                 )
-                output_path, needs_upload = _prepare_output_path(
-                    self._storage, normalized_storage_path, base_dir=base_dir
+                output_path, needs_upload = self._storage_io.prepare_output_path(
+                    normalized_storage_path,
+                    base_dir=base_dir,
+                    default_filename="normalized.mp4",
                 )
                 self._normalizer.normalize(
                     input_path,
@@ -103,8 +107,7 @@ class RunNormalizeStage:
                 metadata = self._normalizer.probe(output_path)
 
                 if needs_upload:
-                    _upload_to_storage(
-                        self._storage,
+                    self._storage_io.upload_to_storage(
                         normalized_storage_path,
                         output_path,
                         content_type="video/mp4",
@@ -119,38 +122,3 @@ class RunNormalizeStage:
         except Exception as exc:
             self._fail_analysis.execute(video_id, Stage.NORMALIZE, str(exc))
             raise
-
-
-def _ensure_parent_dir(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-
-def _materialize_from_storage(storage: Storage, storage_path: str, *, base_dir: Path) -> Path:
-    local_path = storage.get_file_path(storage_path)
-    if local_path is not None and local_path.exists():
-        return local_path
-
-    target_path = base_dir.joinpath(storage_path)
-    _ensure_parent_dir(target_path)
-    target_path.write_bytes(storage.read_file(storage_path))
-    return target_path
-
-
-def _prepare_output_path(
-    storage: Storage, storage_path: str, *, base_dir: Path
-) -> tuple[Path, bool]:
-    local_path = storage.get_file_path(storage_path)
-    if local_path is None:
-        return base_dir.joinpath("normalized.mp4"), True
-    _ensure_parent_dir(local_path)
-    return local_path, False
-
-
-def _upload_to_storage(
-    storage: Storage,
-    storage_path: str,
-    file_path: Path,
-    *,
-    content_type: str | None = None,
-) -> None:
-    storage.write_file(storage_path, file_path.read_bytes(), content_type=content_type)

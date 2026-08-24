@@ -77,6 +77,33 @@ class Settings(BaseSettings):
         description="Triton Inference Server URL",
     )
 
+    # Pose worker
+    pose_model_path: str = Field(
+        default="yolov8n-pose.pt",
+        description="Path or Ultralytics identifier for the pose model",
+    )
+    pose_device: Literal["auto", "cpu", "mps", "cuda"] = Field(
+        default="cpu",
+        description="Device used for pose inference",
+    )
+    pose_imgsz: int = Field(
+        default=640,
+        description="Ultralytics pose inference image size",
+        ge=1,
+    )
+    pose_conf: float = Field(
+        default=0.25,
+        description="Minimum pose detection confidence",
+        ge=0.0,
+        le=1.0,
+    )
+    pose_iou: float = Field(
+        default=0.7,
+        description="IoU threshold used by pose tracking",
+        ge=0.0,
+        le=1.0,
+    )
+
     # API
     api_host: str = Field(
         default="0.0.0.0",

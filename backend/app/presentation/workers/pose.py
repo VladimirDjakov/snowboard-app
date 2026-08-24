@@ -18,4 +18,15 @@ class PoseWorker(BaseWorker):
         return logger
 
     def _execute_stage(self, stage: Stage, video_id: UUID, use_cases: UseCases) -> None:
-        logger.info("Pose task completed (placeholder)", extra={"video_id": str(video_id)})
+        res = use_cases.pose_stage.execute(video_id)
+        if res is not None:
+            self._logger.info(
+                "Pose keypoints extracted",
+                extra={
+                    "video_id": str(video_id),
+                    "storage_path": res.artifact.storage_path,
+                    "fps": res.fps,
+                    "nb_frames": res.nb_frames,
+                    "target_track_id": res.target_track_id,
+                },
+            )
