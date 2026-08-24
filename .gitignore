@@ -212,3 +212,4 @@ runtime/
 
 # Node.js
 frontend/node_modules/
+*.tsbuildinfo
