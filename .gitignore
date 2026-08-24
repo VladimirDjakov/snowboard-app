@@ -209,3 +209,7 @@ __marimo__/
 
 # Inference artifacts
 runtime/
+
+# Node.js
+frontend/node_modules/
+*.tsbuildinfo
